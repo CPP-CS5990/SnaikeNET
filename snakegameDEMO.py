@@ -45,6 +45,7 @@ game_count = 0
 
 memory = deque(maxlen=10000)
 
+
 # Deep Q-Learning Model
 class LinearQNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -58,6 +59,7 @@ class LinearQNet(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
 
 class QTrainer:
     def __init__(self, model, targetModel, lr, gamma):
@@ -88,26 +90,33 @@ class QTrainer:
         for idx in range(len(done)):
             Q_new = reward[idx]
             if not done[idx]:
-                Q_new = reward[idx] + self.gamma * torch.max(self.targetModel(nextState[idx]))
+                Q_new = reward[idx] + self.gamma * torch.max(
+                    self.targetModel(nextState[idx])
+                )
 
             target[idx][action[idx].item()] = Q_new
 
         self.optimizer.zero_grad()
-        loss = self.criterion(pred, target)  # FIX: (prediction, target) is the correct order
+        loss = self.criterion(
+            pred, target
+        )  # FIX: (prediction, target) is the correct order
         loss.backward()
         self.optimizer.step()
 
+
 def plot_scores(scores):
     plt.plot(range(len(scores)), scores)
-    plt.xlabel('Games')
-    plt.ylabel('Scores')
-    plt.title('VENOM SCORE TRACKER')
+    plt.xlabel("Games")
+    plt.ylabel("Scores")
+    plt.title("VENOM SCORE TRACKER")
     plt.show()
+
 
 def scoreCount():
     scoreFont = pygame.font.SysFont("arial", 25)
     scoreDisplay = scoreFont.render("Score : " + str(score), True, white)
     winDisplay.blit(scoreDisplay, [0, 0])
+
 
 # Ends Game + Displays Final Score
 def gameOver():
@@ -123,6 +132,7 @@ def gameOver():
 
     reset_game()
 
+
 def reset_game():
     global snakePos, snakeSize, direction, foodPosX, foodPosY, foodPresent
     snakePos = [150, 100]
@@ -132,6 +142,7 @@ def reset_game():
     foodPosY = random.randrange(1, int(winHeight / 10)) * 10
     foodPresent = True
 
+
 def is_dangerous(x, y):
     if x < 0 or x >= winWidth or y < 0 or y >= winHeight:
         return True
@@ -140,14 +151,15 @@ def is_dangerous(x, y):
             return True
     return False
 
+
 def get_state():
     head_x, head_y = snakePos
     food_x, food_y = foodPosX, foodPosY
 
     # FIX: danger signals so the agent knows which moves lead to death
-    danger_up    = is_dangerous(head_x, head_y - 10)
-    danger_down  = is_dangerous(head_x, head_y + 10)
-    danger_left  = is_dangerous(head_x - 10, head_y)
+    danger_up = is_dangerous(head_x, head_y - 10)
+    danger_down = is_dangerous(head_x, head_y + 10)
+    danger_left = is_dangerous(head_x - 10, head_y)
     danger_right = is_dangerous(head_x + 10, head_y)
 
     state = [
@@ -162,18 +174,19 @@ def get_state():
         danger_down,
         danger_left,
         danger_right,
-        len(snakeSize) / 100,   # normalized snake length
+        len(snakeSize) / 100,  # normalized snake length
     ]
     return np.array(state, dtype=np.float32)
 
+
 # Hyperparameters
-input_size = 11  
+input_size = 11
 hidden_size = 256
-output_size = 4  
+output_size = 4
 learning_rate = 0.002
 gamma = 0.9
 epsilon = 1.0
-decay = 0.99   # FIX: per-episode decay (was per-step 0.995, now gives ~460 episodes of exploration)
+decay = 0.99  # FIX: per-episode decay (was per-step 0.995, now gives ~460 episodes of exploration)
 epsilon_min = 0.01
 batch_size = 64
 
