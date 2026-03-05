@@ -141,6 +141,7 @@ def create_console_thread_instance(command_interface: GameServerCommandInterface
 def setup_logger():
     logger.remove()
     logger.add(sys.stderr, level="INFO")
+    # DEBUG level logging for file logs
     logger.add("logs/game.log", rotation="1 MB", level="DEBUG") # Log to file as well, with rotation
 
 if __name__ == "__main__":
@@ -148,7 +149,6 @@ if __name__ == "__main__":
     args = parse_args() 
 
     game_state = Game()
-        # Implement reset logic here
 
     command_interface = GameServerCommandInterface(
         start_game=game_state.start_game,
