@@ -1,4 +1,7 @@
 # When the snake moves, we should only need to remove the tail and add a new head in the direction of movement.
+from enum import Enum
+
+
 class SnakeBodySegment:
     def __init__(
         self,
@@ -37,36 +40,60 @@ class SnakeBodySegment:
         return self.next_segment
 
 
-UP = 0
-RIGHT = 1
-DOWN = 2
-LEFT = 3
-
+class Direction(Enum):
+    NORTH = 0
+    SOUTH = 1
+    EAST = 2
+    WEST = 3
 
 class SnakePlayer:
+    _head: SnakeBodySegment
+    _tail: SnakeBodySegment
+    _length: int
+    _direction: Direction
+
     def __init__(self, initial_position: tuple[int, int]):
         # Begins at length 1, so the head and tail are the same tile.
         snake_segment = SnakeBodySegment(initial_position)
-        self.head: SnakeBodySegment = snake_segment
-        self.tail: SnakeBodySegment = snake_segment
+        self._head: SnakeBodySegment = snake_segment
+        self._tail: SnakeBodySegment = snake_segment
+        self._length = 1
+        self._direction = Direction.WEST
 
-    def move(self, direction: int, grow: bool = False):
+    def get_head_position(self) -> tuple[int, int]:
+        return self._head.position
 
-        if direction == UP:
-            new_head_position = (self.head.position[0], self.head.position[1] - 1)
-        elif direction == RIGHT:
-            new_head_position = (self.head.position[0] + 1, self.head.position[1])
-        elif direction == DOWN:
-            new_head_position = (self.head.position[0], self.head.position[1] + 1)
-        elif direction == LEFT:
-            new_head_position = (self.head.position[0] - 1, self.head.position[1])
-        else:
-            raise ValueError("Invalid direction")
+    def get_tail_position(self) -> tuple[int, int]:
+        return self._tail.position
 
-        self.head = self.head.add_next(new_head_position)
+    def get_length(self) -> int:
+        return self._length
+
+    def set_direction(self, direction: Direction):
+        self._direction = direction
+
+    def initialize_position(self, position: tuple[int, int]):
+        self._head.position = position
+        self._tail.position = position
+
+    def move(self, grow: bool = False):
+
+        match self._direction:
+            case Direction.NORTH:
+                new_head_position = (self._head.position[0], self._head.position[1] - 1)
+            case Direction.WEST:
+                new_head_position = (self._head.position[0] + 1, self._head.position[1])
+            case Direction.SOUTH:
+                new_head_position = (self._head.position[0], self._head.position[1] + 1)
+            case Direction.EAST:
+                new_head_position = (self._head.position[0] - 1, self._head.position[1])
+
+        self._head = self._head.add_next(new_head_position)
 
         # If we don't grow, we need to remove the tail segment. If we do grow, we just leave the tail where it is
         # since the new head is added in front of it.
         if not grow:
-            self.tail = self.tail.next()
-            self.tail.prev_segment = None
+            self._tail = self._tail.next()
+            self._tail.prev_segment = None
+        else:
+            self._length += 1

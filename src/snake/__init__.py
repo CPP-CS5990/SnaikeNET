@@ -41,96 +41,44 @@
 
 # On the UDP Server, we will listen for messages from players:
 # 
-import uuid
+import time
 import sys
-from parse_args import parse_args
-from player import SnakePlayer
+from snake.game.game import Game
+from snake.parse_args import parse_args
 import threading
 from loguru import logger
-import asyncio
-import random
-import pygame
 
-from server_commands import GameServerCommandInterface
-from fastapi_server_commands import FastAPIServerCommands
+from snake.server_commands import GameServerCommandInterface
+from snake.fastapi_server_commands import FastAPIServerCommands
 
-type Location = tuple[int, int]
-type GridSize = tuple[int, int]
-
-class Game():
-    players: dict[str, SnakePlayer]
-    food_locations: set[Location]
-    _start_event: threading.Event
-    _available_food_locations: set[Location] # TODO: Probably change to list, evaluate later
-
-    def __init__(self):
-        self._start_event = threading.Event()
-        self.players = {}  # Dictionary to store player information
-        self.food_locations: set[tuple[int, int]] = (
-            set()
-        )  # List to store food locations
-        self._available_food_locations: set[tuple[int, int]] = set()
-          # Set to track available food locations
-
-    def _initialize_available_food_locations(self, grid_size: GridSize):
-        self._available_food_locations = set(
-            (x, y) for x in range(grid_size[0]) for y in range(grid_size[1])
-        )
-        # random.shuffle(self._available_food_locations)
-
-    def add_random_food(self, grid_size: GridSize):
-        while True:
-            location = (
-                random.randint(0, grid_size[0] - 1),
-                random.randint(0, grid_size[1] - 1),
-            )
-            if location not in self.food_locations:
-                self.food_locations.add(location)
-                break
-
-    def remove_food(self, location: Location):
-        self.food_locations.discard(location)
-        self._available_food_locations.discard(location)
-
-    def move_players(self):
-        # Implement player movement logic here
-        pass
-
-    def add_player(self):
-        self.players[str(uuid.uuid4())] = SnakePlayer(initial_position=(0, 0))  # TODO: Set initial position based on game logic
-
-    def remove_player(self, player_id: str) -> SnakePlayer | None:
-        return self.players.pop(player_id, None)
-
-    def start_game(self):
-        self._start_event.set()
-
-    def stop_game(self):
-        # TODO: Implement
-        pass
-
-    def restart_game(self):
-        # TODO: Implement
-        pass
-
-def create_game_thread_instance(game_state: Game):
-    def game_thread(): 
+TICK_RATE = 3
+TICK_INTERVAL = 1 / TICK_RATE
+def create_game_thread_instance(game: Game):
+    def game_loop(): 
+        global not_stopped
         logger.info("Game thread started, waiting for start signal...\n")
-        game_state._start_event.wait()
+        game.wait_for_game_start()
 
         logger.info("Start signal received, entering game loop...\n")
-        while True:
+        tick = 0
+        start_time = time.time()
+        while not_stopped:
             # sleep for a fixed tick rate (e.g., 100ms)
+            threading.Event().wait(TICK_INTERVAL)
+            tick += 1
+            logger.debug(f"Tick... {tick} (Elapsed time: {time.time() - start_time:.2f}s)\n")
+            logger.debug(f"Ticks per second: {tick / (time.time() - start_time):.2f}\n")
+            game.move_players()
+        # game.cleanup() # TODO: Implement any necessary cleanup logic when the game loop ends
+        logger.info("Game thread exiting...\n")
 
-            game_state.move_players()
-
-    return threading.Thread(target=game_thread)
+    return threading.Thread(target=game_loop)
 
 def create_console_thread_instance(command_interface: GameServerCommandInterface):
     def console_thread():
         # Always run and listen for console commands
         command_interface.help_message() # Show available commands on startup
-        while True:
+        while not_stopped:
             command = input()
             # Process console commands here
             logger.info(f"Received command: {command}\n")
@@ -138,26 +86,34 @@ def create_console_thread_instance(command_interface: GameServerCommandInterface
 
     return threading.Thread(target=console_thread)
 
-def setup_logger():
+def setup_logger(verbose: bool):
     logger.remove()
-    logger.add(sys.stderr, level="INFO")
-    # DEBUG level logging for file logs
-    logger.add("logs/game.log", rotation="1 MB", level="DEBUG") # Log to file as well, with rotation
+    level = "DEBUG" if verbose else "INFO"
+    logger.add(sys.stderr, level=level)
+    logger.add("logs/game.log", rotation="1 MB", level=level) # Log to file as well, with rotation
 
 if __name__ == "__main__":
-    setup_logger()
-    args = parse_args() 
+    global not_stopped
+    not_stopped = True
 
-    game_state = Game()
+    args = parse_args() 
+    setup_logger(args.verbose)
+
+    game = Game()
+
+    def stop_server():
+        global not_stopped
+        not_stopped = False
+        game.stop_game()
 
     command_interface = GameServerCommandInterface(
-        start_game=game_state.start_game,
-        stop_server=game_state.stop_game,
-        restart_game=game_state.restart_game,
+        start_game=game.start_game,
+        stop_server=stop_server,
+        restart_game=game.restart_game,
     )
 
     # Create thread instances
-    game_thread_instance = create_game_thread_instance(game_state)
+    game_thread_instance = create_game_thread_instance(game)
     console_thread_instance = create_console_thread_instance(command_interface)
 
     # Create FastAPI server instance with command interface
@@ -169,6 +125,8 @@ if __name__ == "__main__":
     console_thread_instance.start()
 
     game_thread_instance.join()
+    logger.info("Game thread has terminated, shutting down console thread...\n")
     console_thread_instance.join()
+    logger.info("Console thread has terminated, exiting program...\n")
     
 
