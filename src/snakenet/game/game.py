@@ -52,19 +52,19 @@ class TileData:
 type PlayerID = str
 
 class _GameState:
-    players: dict[PlayerID, SnakePlayer]
+    _player_ids: list[PlayerID] = []
+    players: dict[PlayerID, SnakePlayer] = {}
     grid_size: GridSize
     grid: list[list[TileData]]
 
     def __init__(self, grid_size: GridSize):
         self.grid_size = grid_size
-        self.players = {}
         self.grid = [[TileData(tile_type=_TileType.EMPTY, player_id=None) for _ in range(grid_size[1])] for _ in range(grid_size[0])]
 
-    # Adds a new player to the game state. The player is initialized to 0, 0 but will be assigned at game start.
+    # Adds a new player to the game state
     def add_new_player(self) -> PlayerID:
         player_id = str(uuid.uuid4())
-        self.players[player_id] = SnakePlayer(initial_position=(0, 0)) # TODO: Change to random position
+        self._player_ids.append(player_id)
         return player_id
 
     def delete_player(self, player_id: str) -> bool:
@@ -79,25 +79,26 @@ class _GameState:
     # to join before the game starts
     def initialize_game_state(self):
         self._initialize_player_positions()
-
+        # get player positions and create a set of available food locations
 
     def _initialize_player_positions(self):
-        num_players = len(self.players)
-        grid_size_padded = (int(self.grid_size[0] * 0.6), int(self.grid_size[1] * 0.6))
+        num_players = len(self._player_ids)
+        grid_size_padded = (int(self.grid_size[0] * 0.65), int(self.grid_size[1] * 0.65))
         logger.debug(f"Initializing player positions for {num_players} players on a grid of size {self.grid_size} (padded size: {grid_size_padded})...\n")
         center_x = int((self.grid_size[0] - 1) / 2)
         center_y = int((self.grid_size[1] - 1) / 2)
         logger.debug(f"Grid center: ({center_x}, {center_y})\n")
-        number_of_layers = (num_players + 7) // 8
+        num_players_per_layer = 6
+        number_of_layers = (num_players + num_players_per_layer - 1) / num_players_per_layer
+        logger.info(f"Number of players: {num_players}, number of layers needed: {number_of_layers}\n")
         distance_from_center = np.sqrt(((grid_size_padded[0] / 2)-1) ** 2 + ((grid_size_padded[1] / 2)-1) ** 2) / number_of_layers
         distance_stride = distance_from_center
         logger.debug(f"Number of layers: {number_of_layers}, initial distance from center: {distance_from_center}\n")
-        for i, player in enumerate(self.players.values()):
-            if i % 8 == 0 and i != 0: # Every 4 players, we need to move to the next layer
-                # TODO: calculate new distance from center
+        for i, player_id in enumerate(self._player_ids):
+            if i % num_players_per_layer == 0 and i != 0: # Every n players, we need to move to the next layer
                 distance_from_center += distance_stride
-            angle = ((1 + 2*i) * np.pi) / 8
+            angle = ((1 + 2*i) * np.pi) / num_players_per_layer
             logger.debug(f"Angle for player {i}: {angle:.2f} radians\n")
-            x = center_x + distance_from_center * np.cos(angle)
-            y = center_y + distance_from_center * np.sin(angle)
-            player.initialize_position((int(np.round(x)), int(np.round(y))))
+            x = int(np.round((center_x + distance_from_center * np.cos(angle))))
+            y = int(np.round((center_y + distance_from_center * np.sin(angle))))
+            self.players[player_id] = SnakePlayer(((int(np.round(x)), int(np.round(y)))))

@@ -7,7 +7,7 @@ def main():
     import sys
 
     # Config
-    grid_size = (100, 100)
+    grid_size = (130, 130)
     tile_px = 13
     num_players = 8
 

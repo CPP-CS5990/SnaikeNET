@@ -71,10 +71,6 @@ class SnakePlayer:
     def set_direction(self, direction: Direction):
         self._direction = direction
 
-    def initialize_position(self, position: tuple[int, int]):
-        self._head.position = position
-        self._tail.position = position
-
     def move(self, grow: bool = False):
 
         match self._direction:
