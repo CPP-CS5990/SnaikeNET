@@ -1,4 +1,5 @@
 from enum import Enum
+import collections
 from loguru import logger
 import numpy as np
 from snakenet.game.player import SnakePlayer
@@ -19,6 +20,9 @@ class Game:
         self.game_state = _GameState(grid_size)
 
     def tick(self):
+        # collisions = self.game_state.detect_collisions()
+        # self.game_state.move_players()
+        # self.game_state.spawn_food()
         pass
 
     def start_game(self):
@@ -64,6 +68,10 @@ class TileData:
 
 type PlayerID = str
 
+class Collision:
+    collidor: str # player id of the collidor
+    collidee: str # player id of the collidee
+
 class _GameState:
     _player_ids: list[PlayerID] = []
     players: dict[PlayerID, SnakePlayer] = {}
@@ -85,6 +93,10 @@ class _GameState:
             return False
         del self.players[player_id]
         return True
+
+    def move_players(self):
+        for player in self.players.values():
+            player.move()
 
     # Run right before the game loop starts to initialize the game state
     # Can't run immediately because the game state is going to depend on
@@ -121,6 +133,10 @@ class _GameState:
             y = int(np.round((center_y + distance_from_center * np.sin(angle))))
             self.players[player_id] = SnakePlayer(((int(np.round(x)), int(np.round(y)))))
 
+    def detect_collisions(self):
+        pass
+
+
 def create_game_thread_instance(game: Game, tick_interval: float) -> threading.Thread:
     def game_loop():
         logger.info("Game thread started, waiting for start signal...\n")
@@ -128,13 +144,27 @@ def create_game_thread_instance(game: Game, tick_interval: float) -> threading.T
 
         logger.info("Start signal received, entering game loop...\n")
         tick = 0
-        start_time = time.time()
+        next_tick_time = time.perf_counter()
+        tick_times = collections.deque(maxlen=100) # Keep track of the last 100 tick times for performance monitoring
         while game.not_stopped():
-            threading.Event().wait(tick_interval)
-            tick += 1
-            logger.debug(f"Tick... {tick} (Elapsed time: {time.time() - start_time:.2f}s)\n")
-            logger.debug(f"Ticks per second: {tick / (time.time() - start_time):.2f}\n")
+            tick_start = time.perf_counter()
             game.tick()
+            tick += 1
+            tick_times.append(time.perf_counter() - tick_start)
+
+            next_tick_time += tick_interval
+            sleep_duration = next_tick_time - time.perf_counter()
+
+            if sleep_duration > 0:
+                threading.Event().wait(sleep_duration)
+            else:
+                logger.warning(f"Tick {tick} overran by {-sleep_duration:.4f}s\n")
+
+            if tick % 100 == 0:
+                avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
+                real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
+                logger.debug(f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n")
+
         # game.cleanup() # TODO: Implement any necessary cleanup logic when the game loop ends
         logger.info("Game thread exiting...\n")
 

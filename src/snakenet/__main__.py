@@ -26,15 +26,15 @@
 # - Do not reset player connections, just reset the game state and send the new state to all players
 
 # Game Loop (runs at a fixed tick rate):
-# - Move players
-#   - Check that direction is valid (not directly opposite of current direction)
-#       - If invalid, ignore the direction change and keep moving in the current direction
 # - Check for collisions
 # - Handle collisions
 #   - If player collides with food, grow from the head and add new food to the board
 #   - If player collides with wall, die
 #   - If player collides with another player, die
 #   - If player collides with itself, die
+# - Move players
+#   - Check that direction is valid (not directly opposite of current direction)
+#       - If invalid, ignore the direction change and keep moving in the current direction
 # - Calculate viewport for all players
 # - Send viewport to all players
 # - If headless is disabled, render game state with pygame
@@ -49,7 +49,7 @@ from loguru import logger
 from snakenet.server_commands import GameServerCommandInterface, create_console_thread_instance
 from snakenet.fastapi_server_commands import FastAPIServerCommands
 
-TICK_RATE = 3
+TICK_RATE = 24
 TICK_INTERVAL = 1 / TICK_RATE
 
 def setup_logger(verbose: bool):
