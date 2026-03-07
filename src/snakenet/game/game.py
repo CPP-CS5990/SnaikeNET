@@ -4,36 +4,49 @@ import numpy as np
 from snakenet.game.player import SnakePlayer
 import threading
 import uuid
+import time
 
 type Location = tuple[int, int]
 type GridSize = tuple[int, int]
 
 class Game:
     game_state: _GameState
-    game_not_stopped: bool = True
     _start_event: threading.Event
-    _available_food_locations: set[Location] # TODO: Probably change to list, evaluate later
+    _stop_signal: bool = False
 
     def __init__(self, grid_size: GridSize):
         self._start_event = threading.Event()
+        self.game_state = _GameState(grid_size)
 
     def tick(self):
         pass
 
     def start_game(self):
         logger.debug("Start event received, starting game loop...\n")
-        self._start_event.set()
+        if self.game_state.initialize_game_state():
+            self._start_event.set()
+            
 
     def stop_game(self):
         logger.debug("Stop event received, stopping game loop...\n")
         self._start_event.set() # Set the event to unblock the game loop if it's waiting
+        self._stop_signal = True
+        self.cleanup()
+        
+    def cleanup(self):
+        logger.debug("Cleaning up game resources...\n")
+        # Implement any necessary cleanup logic here (e.g., saving game state, closing connections, etc.)
+
+    def not_stopped(self) -> bool:
+        return not self._stop_signal
 
     def wait_for_game_start(self):
         logger.debug("Waiting for start event...\n")
         self._start_event.wait()
 
     def restart_game(self):
-        # TODO: Implement
+        self = Game(self.game_state.grid_size)
+        self._start_event.clear()
         pass
 
 class _TileType(Enum):
@@ -77,8 +90,13 @@ class _GameState:
     # Can't run immediately because the game state is going to depend on
     # the number of players that have joined, and we want to allow players 
     # to join before the game starts
-    def initialize_game_state(self):
+    def initialize_game_state(self) -> bool:
+        if len(self._player_ids) == 0:
+            logger.warning("No players have joined the game, cannot initialize game state.\n")
+            return False
+
         self._initialize_player_positions()
+        return True
         # get player positions and create a set of available food locations
 
     def _initialize_player_positions(self):
@@ -102,3 +120,22 @@ class _GameState:
             x = int(np.round((center_x + distance_from_center * np.cos(angle))))
             y = int(np.round((center_y + distance_from_center * np.sin(angle))))
             self.players[player_id] = SnakePlayer(((int(np.round(x)), int(np.round(y)))))
+
+def create_game_thread_instance(game: Game, tick_interval: float) -> threading.Thread:
+    def game_loop():
+        logger.info("Game thread started, waiting for start signal...\n")
+        game.wait_for_game_start()
+
+        logger.info("Start signal received, entering game loop...\n")
+        tick = 0
+        start_time = time.time()
+        while game.not_stopped():
+            threading.Event().wait(tick_interval)
+            tick += 1
+            logger.debug(f"Tick... {tick} (Elapsed time: {time.time() - start_time:.2f}s)\n")
+            logger.debug(f"Ticks per second: {tick / (time.time() - start_time):.2f}\n")
+            game.tick()
+        # game.cleanup() # TODO: Implement any necessary cleanup logic when the game loop ends
+        logger.info("Game thread exiting...\n")
+
+    return threading.Thread(target=game_loop)

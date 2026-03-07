@@ -1,5 +1,6 @@
 from typing import Callable
 from loguru import logger
+import threading
 
 COMMAND_START = "start"
 COMMAND_STOP = "stop"
@@ -14,6 +15,8 @@ Available commands:
 """
 
 class GameServerCommandInterface:
+    _stop_signal: bool = False
+
     def __init__(
         self,
         start_game: Callable[[], None] | None = None,
@@ -60,3 +63,23 @@ class GameServerCommandInterface:
             handler()
         else:
             logger.error(f"Unknown command: {command}")
+
+    def not_stopped(self) -> bool:
+        return not self._stop_signal
+
+    def set_stop_signal(self):
+        self._stop_signal = True
+
+def create_console_thread_instance(command_interface: GameServerCommandInterface):
+    def console_thread():
+        # Always run and listen for console commands
+        command_interface.help_message()  # Show available commands on startup
+        while command_interface.not_stopped():
+            command = input()
+            # Process console commands here
+            logger.info(f"Received command: {command}\n")
+            command_interface.execute_command(command)
+
+        logger.info("Console thread stopping...\n")
+
+    return threading.Thread(target=console_thread)
