@@ -1,4 +1,4 @@
-from server_commands import GameServerCommandInterface
+from snakenet.server_commands import GameServerCommandInterface
 from fastapi import FastAPI
 
 

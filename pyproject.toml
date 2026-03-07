@@ -17,6 +17,7 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 server = "snakenet.__main__:main"
+visualize_gamestate = "snakenet.game.visualize_gamestate:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

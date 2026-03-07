@@ -49,7 +49,7 @@ import threading
 from loguru import logger
 
 from snakenet.server_commands import GameServerCommandInterface
-from fastapi_server_commands import FastAPIServerCommands
+from snakenet.fastapi_server_commands import FastAPIServerCommands
 
 TICK_RATE = 3
 TICK_INTERVAL = 1 / TICK_RATE
