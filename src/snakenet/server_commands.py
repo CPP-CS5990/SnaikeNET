@@ -14,6 +14,7 @@ Available commands:
     - help: Show this help message
 """
 
+
 class GameServerCommandInterface:
     _stop_signal: bool = False
 
@@ -69,6 +70,7 @@ class GameServerCommandInterface:
 
     def set_stop_signal(self):
         self._stop_signal = True
+
 
 def create_console_thread_instance(command_interface: GameServerCommandInterface):
     def console_thread():

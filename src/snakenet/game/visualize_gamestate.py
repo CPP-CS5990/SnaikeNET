@@ -2,6 +2,7 @@ from numpy.random import randint
 
 from snakenet.game.game import _GameState
 
+
 def main():
     import pygame
     import sys
@@ -52,7 +53,7 @@ def main():
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (
-                    event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
             ):
                 pygame.quit()
                 sys.exit()

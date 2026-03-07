@@ -40,23 +40,30 @@
 # - If headless is disabled, render game state with pygame
 
 # On the UDP Server, we will listen for messages from players:
-# 
+#
 import sys
 from snakenet.game.game import Game, create_game_thread_instance
 from snakenet.parse_args import parse_args
 from loguru import logger
 
-from snakenet.server_commands import GameServerCommandInterface, create_console_thread_instance
+from snakenet.server_commands import (
+    GameServerCommandInterface,
+    create_console_thread_instance,
+)
 from snakenet.fastapi_server_commands import FastAPIServerCommands
 
 TICK_RATE = 24
 TICK_INTERVAL = 1 / TICK_RATE
 
+
 def setup_logger(verbose: bool):
     logger.remove()
     level = "DEBUG" if verbose else "INFO"
     logger.add(sys.stderr, level=level)
-    logger.add("logs/game.log", rotation="1 MB", level=level)  # Log to file as well, with rotation
+    logger.add(
+        "logs/game.log", rotation="1 MB", level=level
+    )  # Log to file as well, with rotation
+
 
 def main():
     args = parse_args()
@@ -85,6 +92,7 @@ def main():
     # Start threads
     game_thread_instance.start()
     console_thread_instance.start()
+
 
 if __name__ == "__main__":
     not_stopped = True

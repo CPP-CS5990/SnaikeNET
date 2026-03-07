@@ -10,6 +10,7 @@ import time
 type Location = tuple[int, int]
 type GridSize = tuple[int, int]
 
+
 class Game:
     game_state: _GameState
     _start_event: threading.Event
@@ -29,14 +30,13 @@ class Game:
         logger.debug("Start event received, starting game loop...\n")
         if self.game_state.initialize_game_state():
             self._start_event.set()
-            
 
     def stop_game(self):
         logger.debug("Stop event received, stopping game loop...\n")
-        self._start_event.set() # Set the event to unblock the game loop if it's waiting
+        self._start_event.set()  # Set the event to unblock the game loop if it's waiting
         self._stop_signal = True
         self.cleanup()
-        
+
     def cleanup(self):
         logger.debug("Cleaning up game resources...\n")
         # Implement any necessary cleanup logic here (e.g., saving game state, closing connections, etc.)
@@ -53,24 +53,31 @@ class Game:
         self._start_event.clear()
         pass
 
+
 class _TileType(Enum):
     EMPTY = 0
     FOOD = 1
     SNAKE = 2
 
+
 class _TileData:
     tile_type: _TileType
     player_id: str | None
 
-    def __init__(self, tile_type: _TileType = _TileType.EMPTY, player_id: str | None = None):
+    def __init__(
+        self, tile_type: _TileType = _TileType.EMPTY, player_id: str | None = None
+    ):
         self.tile_type = tile_type
         self.player_id = player_id
 
+
 type PlayerID = str
 
+
 class Collision:
-    collidor: str # player id of the collidor
-    collidee: str # player id of the collidee
+    collidor: str  # player id of the collidor
+    collidee: str  # player id of the collidee
+
 
 class _GameState:
     _players: dict[PlayerID, SnakePlayer] = {}
@@ -79,12 +86,20 @@ class _GameState:
 
     def __init__(self, grid_size: GridSize):
         self.grid_size = grid_size
-        self.grid = [[_TileData(tile_type=_TileType.EMPTY, player_id=None) for _ in range(grid_size[1])] for _ in range(grid_size[0])]
+        self.grid = [
+            [
+                _TileData(tile_type=_TileType.EMPTY, player_id=None)
+                for _ in range(grid_size[1])
+            ]
+            for _ in range(grid_size[0])
+        ]
 
     # Adds a new player to the game state
     def add_new_player(self) -> PlayerID:
         player_id = str(uuid.uuid4())
-        self._players[player_id] = SnakePlayer((0, 0)) # Temporary position, will be set properly in initialize_game_state
+        self._players[player_id] = SnakePlayer(
+            (0, 0)
+        )  # Temporary position, will be set properly in initialize_game_state
         return player_id
 
     def delete_player(self, player_id: str) -> bool:
@@ -99,11 +114,13 @@ class _GameState:
 
     # Run right before the game loop starts to initialize the game state
     # Can't run immediately because the game state is going to depend on
-    # the number of players that have joined, and we want to allow players 
+    # the number of players that have joined, and we want to allow players
     # to join before the game starts
     def initialize_game_state(self) -> bool:
         if len(self._players) == 0:
-            logger.warning("No players have joined the game, cannot initialize game state.\n")
+            logger.warning(
+                "No players have joined the game, cannot initialize game state.\n"
+            )
             return False
 
         self._initialize_player_positions()
@@ -112,8 +129,13 @@ class _GameState:
 
     def _initialize_player_positions(self):
         num_players = len(self._players)
-        grid_size_padded = (int(self.grid_size[0] * 0.65), int(self.grid_size[1] * 0.65))
-        logger.debug(f"Initializing player positions for {num_players} players on a grid of size {self.grid_size} (padded size: {grid_size_padded})...\n")
+        grid_size_padded = (
+            int(self.grid_size[0] * 0.65),
+            int(self.grid_size[1] * 0.65),
+        )
+        logger.debug(
+            f"Initializing player positions for {num_players} players on a grid of size {self.grid_size} (padded size: {grid_size_padded})...\n"
+        )
 
         center_x = int((self.grid_size[0] - 1) / 2)
         center_y = int((self.grid_size[1] - 1) / 2)
@@ -121,18 +143,30 @@ class _GameState:
 
         num_players_per_layer = 6
 
-        number_of_layers = (num_players + num_players_per_layer - 1) / num_players_per_layer
-        logger.info(f"Number of players: {num_players}, number of layers needed: {number_of_layers}\n")
+        number_of_layers = (
+            num_players + num_players_per_layer - 1
+        ) / num_players_per_layer
+        logger.info(
+            f"Number of players: {num_players}, number of layers needed: {number_of_layers}\n"
+        )
 
-        distance_from_center = np.sqrt(((grid_size_padded[0] / 2)-1) ** 2 + ((grid_size_padded[1] / 2)-1) ** 2) / number_of_layers
+        distance_from_center = (
+            np.sqrt(
+                ((grid_size_padded[0] / 2) - 1) ** 2
+                + ((grid_size_padded[1] / 2) - 1) ** 2
+            )
+            / number_of_layers
+        )
         distance_stride = distance_from_center
-        logger.debug(f"Number of layers: {number_of_layers}, initial distance from center: {distance_from_center}\n")
+        logger.debug(
+            f"Number of layers: {number_of_layers}, initial distance from center: {distance_from_center}\n"
+        )
 
         for i, player_id in enumerate(self._players):
             if i % num_players_per_layer == 0 and i != 0:
                 distance_from_center += distance_stride
 
-            angle = ((1 + 2*i) * np.pi) / num_players_per_layer
+            angle = ((1 + 2 * i) * np.pi) / num_players_per_layer
             logger.debug(f"Angle for player {i}: {angle:.2f} radians\n")
 
             x = int(np.round((center_x + distance_from_center * np.cos(angle))))
@@ -154,7 +188,9 @@ def create_game_thread_instance(game: Game, tick_interval: float) -> threading.T
         logger.info("Start signal received, entering game loop...\n")
         tick = 0
         next_tick_time = time.perf_counter()
-        tick_times = collections.deque(maxlen=100) # Keep track of the last 100 tick times for performance monitoring
+        tick_times = collections.deque(
+            maxlen=100
+        )  # Keep track of the last 100 tick times for performance monitoring
         while game.not_stopped():
             tick_start = time.perf_counter()
             game.tick()
@@ -172,7 +208,9 @@ def create_game_thread_instance(game: Game, tick_interval: float) -> threading.T
             if tick % 100 == 0:
                 avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
                 real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
-                logger.debug(f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n")
+                logger.debug(
+                    f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
+                )
 
         game.cleanup()
         logger.info("Game thread exiting...\n")

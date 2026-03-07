@@ -1,6 +1,7 @@
 # When the snake moves, we should only need to remove the tail and add a new head in the direction of movement.
 from enum import Enum
 
+
 class SnakeBodySegment:
     def __init__(
         self,
@@ -44,6 +45,7 @@ class Direction(Enum):
     SOUTH = 1
     EAST = 2
     WEST = 3
+
 
 class SnakePlayer:
     _head: SnakeBodySegment
