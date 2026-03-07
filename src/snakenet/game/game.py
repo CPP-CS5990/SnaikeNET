@@ -58,7 +58,7 @@ class _TileType(Enum):
     FOOD = 1
     SNAKE = 2
 
-class TileData:
+class _TileData:
     tile_type: _TileType
     player_id: str | None
 
@@ -73,29 +73,28 @@ class Collision:
     collidee: str # player id of the collidee
 
 class _GameState:
-    _player_ids: list[PlayerID] = []
-    players: dict[PlayerID, SnakePlayer] = {}
+    _players: dict[PlayerID, SnakePlayer] = {}
     grid_size: GridSize
-    grid: list[list[TileData]]
+    grid: list[list[_TileData]]
 
     def __init__(self, grid_size: GridSize):
         self.grid_size = grid_size
-        self.grid = [[TileData(tile_type=_TileType.EMPTY, player_id=None) for _ in range(grid_size[1])] for _ in range(grid_size[0])]
+        self.grid = [[_TileData(tile_type=_TileType.EMPTY, player_id=None) for _ in range(grid_size[1])] for _ in range(grid_size[0])]
 
     # Adds a new player to the game state
     def add_new_player(self) -> PlayerID:
         player_id = str(uuid.uuid4())
-        self._player_ids.append(player_id)
+        self._players[player_id] = SnakePlayer((0, 0)) # Temporary position, will be set properly in initialize_game_state
         return player_id
 
     def delete_player(self, player_id: str) -> bool:
-        if player_id not in self.players:
+        if player_id not in self._players:
             return False
-        del self.players[player_id]
+        del self._players[player_id]
         return True
 
     def move_players(self):
-        for player in self.players.values():
+        for player in self._players.values():
             player.move()
 
     # Run right before the game loop starts to initialize the game state
@@ -103,7 +102,7 @@ class _GameState:
     # the number of players that have joined, and we want to allow players 
     # to join before the game starts
     def initialize_game_state(self) -> bool:
-        if len(self._player_ids) == 0:
+        if len(self._players) == 0:
             logger.warning("No players have joined the game, cannot initialize game state.\n")
             return False
 
@@ -112,26 +111,36 @@ class _GameState:
         # get player positions and create a set of available food locations
 
     def _initialize_player_positions(self):
-        num_players = len(self._player_ids)
+        num_players = len(self._players)
         grid_size_padded = (int(self.grid_size[0] * 0.65), int(self.grid_size[1] * 0.65))
         logger.debug(f"Initializing player positions for {num_players} players on a grid of size {self.grid_size} (padded size: {grid_size_padded})...\n")
+
         center_x = int((self.grid_size[0] - 1) / 2)
         center_y = int((self.grid_size[1] - 1) / 2)
         logger.debug(f"Grid center: ({center_x}, {center_y})\n")
+
         num_players_per_layer = 6
+
         number_of_layers = (num_players + num_players_per_layer - 1) / num_players_per_layer
         logger.info(f"Number of players: {num_players}, number of layers needed: {number_of_layers}\n")
+
         distance_from_center = np.sqrt(((grid_size_padded[0] / 2)-1) ** 2 + ((grid_size_padded[1] / 2)-1) ** 2) / number_of_layers
         distance_stride = distance_from_center
         logger.debug(f"Number of layers: {number_of_layers}, initial distance from center: {distance_from_center}\n")
-        for i, player_id in enumerate(self._player_ids):
-            if i % num_players_per_layer == 0 and i != 0: # Every n players, we need to move to the next layer
+
+        for i, player_id in enumerate(self._players):
+            if i % num_players_per_layer == 0 and i != 0:
                 distance_from_center += distance_stride
+
             angle = ((1 + 2*i) * np.pi) / num_players_per_layer
             logger.debug(f"Angle for player {i}: {angle:.2f} radians\n")
+
             x = int(np.round((center_x + distance_from_center * np.cos(angle))))
             y = int(np.round((center_y + distance_from_center * np.sin(angle))))
-            self.players[player_id] = SnakePlayer(((int(np.round(x)), int(np.round(y)))))
+
+            # Update the player position in the game state and mark the grid
+            self._players[player_id] = SnakePlayer((x, y))
+            self.grid[x][y] = _TileData(tile_type=_TileType.SNAKE, player_id=player_id)
 
     def detect_collisions(self):
         pass
@@ -165,7 +174,7 @@ def create_game_thread_instance(game: Game, tick_interval: float) -> threading.T
                 real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
                 logger.debug(f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n")
 
-        # game.cleanup() # TODO: Implement any necessary cleanup logic when the game loop ends
+        game.cleanup()
         logger.info("Game thread exiting...\n")
 
     return threading.Thread(target=game_loop)

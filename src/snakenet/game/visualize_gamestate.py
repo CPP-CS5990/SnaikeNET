@@ -38,7 +38,7 @@ def main():
 
     # Draw players
     font = pygame.font.SysFont(None, 14)
-    for i, (uid, player) in enumerate(state.players.items()):
+    for i, (uid, player) in enumerate(state._players.items()):
         px, py = player.get_head_position()
         color = player_colors[i % len(player_colors)]
         rect = pygame.Rect(px * tile_px, py * tile_px, tile_px, tile_px)

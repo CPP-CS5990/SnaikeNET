@@ -1,4 +1,3 @@
-import pytest
 from loguru import logger
 
 from snakenet.game.game import _GameState
