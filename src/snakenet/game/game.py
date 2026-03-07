@@ -1,7 +1,7 @@
 from enum import Enum
 from loguru import logger
 import numpy as np
-from snake.game.player import SnakePlayer
+from snakenet.game.player import SnakePlayer
 import threading
 import uuid
 
@@ -16,6 +16,9 @@ class Game:
 
     def __init__(self, grid_size: GridSize):
         self._start_event = threading.Event()
+
+    def tick(self):
+        pass
 
     def start_game(self):
         logger.debug("Start event received, starting game loop...\n")
@@ -85,72 +88,16 @@ class _GameState:
         center_x = int((self.grid_size[0] - 1) / 2)
         center_y = int((self.grid_size[1] - 1) / 2)
         logger.debug(f"Grid center: ({center_x}, {center_y})\n")
-        number_of_layers = (num_players + 3) // 4
+        number_of_layers = (num_players + 7) // 8
         distance_from_center = np.sqrt(((grid_size_padded[0] / 2)-1) ** 2 + ((grid_size_padded[1] / 2)-1) ** 2) / number_of_layers
         distance_stride = distance_from_center
         logger.debug(f"Number of layers: {number_of_layers}, initial distance from center: {distance_from_center}\n")
         for i, player in enumerate(self.players.values()):
-            if i % 4 == 0 and i != 0: # Every 4 players, we need to move to the next layer
+            if i % 8 == 0 and i != 0: # Every 4 players, we need to move to the next layer
                 # TODO: calculate new distance from center
                 distance_from_center += distance_stride
-            angle = ((1 + 2*i) * np.pi) / 4
+            angle = ((1 + 2*i) * np.pi) / 8
             logger.debug(f"Angle for player {i}: {angle:.2f} radians\n")
             x = center_x + distance_from_center * np.cos(angle)
             y = center_y + distance_from_center * np.sin(angle)
             player.initialize_position((int(np.round(x)), int(np.round(y))))
-
-if __name__ == "__main__":
-    import pygame
-    import sys
-
-    # Config
-    GRID_SIZE = (30, 30)
-    TILE_PX = 20
-    NUM_PLAYERS = 8
-
-    pygame.init()
-    screen = pygame.display.set_mode((GRID_SIZE[0] * TILE_PX, GRID_SIZE[1] * TILE_PX))
-    pygame.display.set_caption("GameState Visualizer")
-
-    # Setup
-    state = _GameState(GRID_SIZE)
-    for _ in range(NUM_PLAYERS):
-        state.add_new_player()
-    state.initialize_game_state()
-
-    # Colors
-    BG = (30, 30, 30)
-    GRID_LINE = (50, 50, 50)
-    PLAYER_COLORS = [
-        (255, 80, 80), (80, 255, 80), (80, 80, 255), (255, 255, 80),
-        (255, 80, 255), (80, 255, 255), (255, 160, 80), (160, 80, 255),
-    ]
-
-    screen.fill(BG)
-
-    # Draw grid lines
-    for x in range(GRID_SIZE[0]):
-        for y in range(GRID_SIZE[1]):
-            rect = pygame.Rect(x * TILE_PX, y * TILE_PX, TILE_PX, TILE_PX)
-            pygame.draw.rect(screen, GRID_LINE, rect, 1)
-
-    # Draw players
-    font = pygame.font.SysFont(None, 14)
-    for i, (uid, player) in enumerate(state.players.items()):
-        px, py = player.get_head_position()
-        color = PLAYER_COLORS[i % len(PLAYER_COLORS)]
-        rect = pygame.Rect(px * TILE_PX, py * TILE_PX, TILE_PX, TILE_PX)
-        pygame.draw.rect(screen, color, rect)
-        label = font.render(str(i), True, (0, 0, 0))
-        screen.blit(label, (px * TILE_PX + 4, py * TILE_PX + 4))
-
-    pygame.display.flip()
-
-    # Hold window open
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT or (
-                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
-            ):
-                pygame.quit()
-                sys.exit()

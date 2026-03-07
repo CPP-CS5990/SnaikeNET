@@ -43,18 +43,20 @@
 # 
 import time
 import sys
-from snake.game.game import Game
-from snake.parse_args import parse_args
+from snakenet.game.game import Game
+from snakenet.parse_args import parse_args
 import threading
 from loguru import logger
 
-from snake.server_commands import GameServerCommandInterface
-from snake.fastapi_server_commands import FastAPIServerCommands
+from snakenet.server_commands import GameServerCommandInterface
+from fastapi_server_commands import FastAPIServerCommands
 
 TICK_RATE = 3
 TICK_INTERVAL = 1 / TICK_RATE
+
+
 def create_game_thread_instance(game: Game):
-    def game_loop(): 
+    def game_loop():
         global not_stopped
         logger.info("Game thread started, waiting for start signal...\n")
         game.wait_for_game_start()
@@ -68,16 +70,17 @@ def create_game_thread_instance(game: Game):
             tick += 1
             logger.debug(f"Tick... {tick} (Elapsed time: {time.time() - start_time:.2f}s)\n")
             logger.debug(f"Ticks per second: {tick / (time.time() - start_time):.2f}\n")
-            game.move_players()
+            game.tick()
         # game.cleanup() # TODO: Implement any necessary cleanup logic when the game loop ends
         logger.info("Game thread exiting...\n")
 
     return threading.Thread(target=game_loop)
 
+
 def create_console_thread_instance(command_interface: GameServerCommandInterface):
     def console_thread():
         # Always run and listen for console commands
-        command_interface.help_message() # Show available commands on startup
+        command_interface.help_message()  # Show available commands on startup
         while not_stopped:
             command = input()
             # Process console commands here
@@ -86,20 +89,21 @@ def create_console_thread_instance(command_interface: GameServerCommandInterface
 
     return threading.Thread(target=console_thread)
 
+
 def setup_logger(verbose: bool):
     logger.remove()
     level = "DEBUG" if verbose else "INFO"
     logger.add(sys.stderr, level=level)
-    logger.add("logs/game.log", rotation="1 MB", level=level) # Log to file as well, with rotation
+    logger.add("logs/game.log", rotation="1 MB", level=level)  # Log to file as well, with rotation
 
-if __name__ == "__main__":
+def main():
     global not_stopped
     not_stopped = True
 
-    args = parse_args() 
+    args = parse_args()
     setup_logger(args.verbose)
 
-    game = Game()
+    game = Game((128, 128))
 
     def stop_server():
         global not_stopped
@@ -117,7 +121,7 @@ if __name__ == "__main__":
     console_thread_instance = create_console_thread_instance(command_interface)
 
     # Create FastAPI server instance with command interface
-    if False: # TODO: Implement when HTTP server is ready
+    if False:  # TODO: Implement when HTTP server is ready
         fastapi_command_interface = FastAPIServerCommands(command_interface)
 
     # Start threads
@@ -128,5 +132,8 @@ if __name__ == "__main__":
     logger.info("Game thread has terminated, shutting down console thread...\n")
     console_thread_instance.join()
     logger.info("Console thread has terminated, exiting program...\n")
-    
 
+
+if __name__ == "__main__":
+    not_stopped = True
+    main()
