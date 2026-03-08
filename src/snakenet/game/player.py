@@ -1,11 +1,10 @@
 # When the snake moves, we should only need to remove the tail and add a new head in the direction of movement.
-from enum import Enum
-
+from snakenet.game.types import Direction, PlayerID, Position
 
 class SnakeBodySegment:
     def __init__(
         self,
-        position: tuple[int, int],
+        position: Position,
         prev_segment: SnakeBodySegment | None = None,
         next_segment: SnakeBodySegment | None = None,
     ):
@@ -35,16 +34,9 @@ class SnakeBodySegment:
             raise ValueError("This segment has no previous segment")
         return self.prev_segment
 
-    def add_next(self, position: tuple[int, int]) -> SnakeBodySegment:
+    def add_next(self, position: Position) -> SnakeBodySegment:
         self.next_segment = SnakeBodySegment(position, prev_segment=self)
         return self.next_segment
-
-
-class Direction(Enum):
-    NORTH = 0
-    SOUTH = 1
-    EAST = 2
-    WEST = 3
 
 
 class SnakePlayer:
@@ -52,19 +44,35 @@ class SnakePlayer:
     _tail: SnakeBodySegment
     _length: int
     _direction: Direction
+    _player_id: PlayerID
 
-    def __init__(self, initial_position: tuple[int, int]):
+    def __init__(self, initial_position: Position, player_id: PlayerID):
         # Begins at length 1, so the head and tail are the same tile.
         snake_segment = SnakeBodySegment(initial_position)
         self._head: SnakeBodySegment = snake_segment
         self._tail: SnakeBodySegment = snake_segment
         self._length = 1
         self._direction = Direction.WEST
+        self._player_id = player_id
 
-    def get_head_position(self) -> tuple[int, int]:
+    def get_head_position(self) -> Position:
         return self._head.position
 
-    def get_tail_position(self) -> tuple[int, int]:
+    def add_head(self) -> Position:
+        self._head = self._head.add_next(self.get_next_head_position())
+        self._length += 1
+        return self._head.position
+
+    def remove_tail(self) -> Position:
+        if self._length == 0:
+            raise ValueError("Cannot remove tail from an empty snake")
+        old_tail_position = self._tail.position
+        self._tail = self._tail.next()
+        self._tail.prev_segment = None
+        self._length -= 1
+        return old_tail_position
+
+    def get_tail_position(self) -> Position:
         return self._tail.position
 
     def get_length(self) -> int:
@@ -73,24 +81,14 @@ class SnakePlayer:
     def set_direction(self, direction: Direction):
         self._direction = direction
 
-    def move(self, grow: bool = False):
-
+    def get_next_head_position(self) -> Position:
         match self._direction:
             case Direction.NORTH:
-                new_head_position = (self._head.position[0], self._head.position[1] - 1)
+                return (self._head.position[0], self._head.position[1] - 1)
             case Direction.WEST:
-                new_head_position = (self._head.position[0] + 1, self._head.position[1])
+                return (self._head.position[0] - 1, self._head.position[1])
             case Direction.SOUTH:
-                new_head_position = (self._head.position[0], self._head.position[1] + 1)
+                return (self._head.position[0], self._head.position[1] + 1)
             case Direction.EAST:
-                new_head_position = (self._head.position[0] - 1, self._head.position[1])
+                return (self._head.position[0] + 1, self._head.position[1])
 
-        self._head = self._head.add_next(new_head_position)
-
-        # If we don't grow, we need to remove the tail segment. If we do grow, we just leave the tail where it is
-        # since the new head is added in front of it.
-        if not grow:
-            self._tail = self._tail.next()
-            self._tail.prev_segment = None
-        else:
-            self._length += 1

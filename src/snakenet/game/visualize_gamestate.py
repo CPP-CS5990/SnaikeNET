@@ -1,6 +1,6 @@
 from numpy.random import randint
 
-from snakenet.game.game import _GameState
+from snakenet.game.game import GameState
 
 
 def main():
@@ -17,7 +17,7 @@ def main():
     pygame.display.set_caption("GameState Visualizer")
 
     # Setup
-    state = _GameState(grid_size)
+    state = GameState(grid_size)
     for _ in range(num_players):
         state.add_new_player()
     state.initialize_game_state()

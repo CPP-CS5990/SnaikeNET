@@ -7,29 +7,26 @@ import threading
 import uuid
 import time
 
-type Location = tuple[int, int]
-type GridSize = tuple[int, int]
-
+from snakenet.game.types import PlayerID, Position, GridSize
 
 class Game:
-    game_state: _GameState
+    game_state: GameState
     _start_event: threading.Event
     _stop_signal: bool = False
 
     def __init__(self, grid_size: GridSize):
         self._start_event = threading.Event()
-        self.game_state = _GameState(grid_size)
+        self.game_state = GameState(grid_size)
 
     def tick(self):
-        # collisions = self.game_state.detect_collisions()
-        # self.game_state.move_players()
-        # self.game_state.spawn_food()
-        pass
+        self.game_state.move_players()
 
     def start_game(self):
         logger.debug("Start event received, starting game loop...\n")
         if self.game_state.initialize_game_state():
             self._start_event.set()
+        else:
+            logger.error("Failed to initialize game state, cannot start game loop.\n")
 
     def stop_game(self):
         logger.debug("Stop event received, stopping game loop...\n")
@@ -49,7 +46,7 @@ class Game:
         self._start_event.wait()
 
     def restart_game(self):
-        self = Game(self.game_state.grid_size)
+        self = Game(self.game_state.get_grid_size())
         self._start_event.clear()
         pass
 
@@ -59,58 +56,107 @@ class _TileType(Enum):
     FOOD = 1
     SNAKE = 2
 
-
-class _TileData:
+class TileData:
     tile_type: _TileType
-    player_id: str | None
+    player_ids: list[PlayerID] # Multiple players can occupy the same tile temporarily during collisions
 
     def __init__(
-        self, tile_type: _TileType = _TileType.EMPTY, player_id: str | None = None
+        self, tile_type: _TileType = _TileType.EMPTY
     ):
         self.tile_type = tile_type
-        self.player_id = player_id
+        self.player_ids = []
 
+    def add_player(self, player_id: PlayerID):
+        if player_id not in self.player_ids:
+            self.player_ids.append(player_id)
+            self.tile_type = _TileType.SNAKE
+    
+    def remove_player(self, player_id: PlayerID):
+        if player_id in self.player_ids:
+            self.player_ids.remove(player_id)
+            if len(self.player_ids) == 0:
+                self.tile_type = _TileType.EMPTY
 
-type PlayerID = str
-
+    def make_food(self):
+        self.tile_type = _TileType.FOOD
+        if len(self.player_ids) > 0:
+            logger.critical(f"Attempting to place food on a tile that is currently occupied by players: {self.player_ids}!\n")
 
 class Collision:
-    collidor: str  # player id of the collidor
-    collidee: str  # player id of the collidee
+    collidor: PlayerID # player id of the collidor
+    collidee: PlayerID # player id of the collidee
 
-
-class _GameState:
-    _players: dict[PlayerID, SnakePlayer] = {}
-    grid_size: GridSize
-    grid: list[list[_TileData]]
-
+class _Grid:
+    _grid_size: GridSize
+    _grid: list[list[TileData]]
+    
     def __init__(self, grid_size: GridSize):
-        self.grid_size = grid_size
-        self.grid = [
+        self._grid_size = grid_size
+        self._grid = [
             [
-                _TileData(tile_type=_TileType.EMPTY, player_id=None)
+                TileData(tile_type=_TileType.EMPTY)
                 for _ in range(grid_size[1])
             ]
             for _ in range(grid_size[0])
         ]
 
+    def remove_player_at(self, position: Position, player_id: PlayerID):
+        self._grid[position[0]][position[1]].remove_player(player_id)
+
+    def add_player_at(self, position: Position, player_id: PlayerID):
+        self._grid[position[0]][position[1]].add_player(player_id)
+
+    def food_at(self, position: Position) -> bool:
+        return self._grid[position[0]][position[1]].tile_type == _TileType.FOOD
+
+    def get_grid_size(self) -> GridSize:
+        return self._grid_size
+
+    def get_tile_data(self, position: Position) -> TileData:
+        return self._grid[position[0]][position[1]]
+
+class GameState:
+    _players: dict[PlayerID, SnakePlayer] = {}
+    _grid: _Grid
+
+    def __init__(self, grid_size: GridSize):
+        self._grid = _Grid(grid_size)
+
     # Adds a new player to the game state
     def add_new_player(self) -> PlayerID:
         player_id = str(uuid.uuid4())
         self._players[player_id] = SnakePlayer(
-            (0, 0)
-        )  # Temporary position, will be set properly in initialize_game_state
+            (0, 0),  # Temporary position, will be set properly in initialize_game_state
+            player_id
+        )
         return player_id
 
-    def delete_player(self, player_id: str) -> bool:
+    def delete_player(self, player_id: PlayerID) -> bool:
         if player_id not in self._players:
             return False
+        while self._players[player_id].get_length() > 0:
+            tail_position = self._players[player_id].remove_tail()
+            self._grid.remove_player_at(tail_position, player_id)  # Mark the old tail position as empty on the grid
         del self._players[player_id]
         return True
 
     def move_players(self):
-        for player in self._players.values():
-            player.move()
+        for player_id, player in self._players.items():
+            next_head_position = player.add_head()
+
+            if not self._grid.food_at(next_head_position):
+                tail_position = player.remove_tail()
+                self._grid.remove_player_at(tail_position, player_id)  # Mark the old tail position as empty on the grid
+
+            self._grid.add_player_at(next_head_position, player_id)  # Mark the new head position as occupied by the player on the grid
+
+    def get_grid_size(self) -> GridSize:
+        return self._grid.get_grid_size()
+
+    def get_tile_data(self, position: Position) -> TileData:
+        return self._grid.get_tile_data(position)
+
+
 
     # Run right before the game loop starts to initialize the game state
     # Can't run immediately because the game state is going to depend on
@@ -125,27 +171,28 @@ class _GameState:
 
         self._initialize_player_positions()
         return True
-        # get player positions and create a set of available food locations
+        # get player positions and create a set of available food position
 
     def _initialize_player_positions(self):
         num_players = len(self._players)
+        grid_size_x, grid_size_y = self.get_grid_size()
         grid_size_padded = (
-            int(self.grid_size[0] * 0.65),
-            int(self.grid_size[1] * 0.65),
+            int(grid_size_x * 0.65),
+            int(grid_size_y * 0.65),
         )
         logger.debug(
-            f"Initializing player positions for {num_players} players on a grid of size {self.grid_size} (padded size: {grid_size_padded})...\n"
+            f"Initializing player positions for {num_players} players on a grid of size ({grid_size_x}, {grid_size_y}) (padded size: {grid_size_padded})...\n"
         )
 
-        center_x = int((self.grid_size[0] - 1) / 2)
-        center_y = int((self.grid_size[1] - 1) / 2)
+        center_x = int((grid_size_x - 1) / 2)
+        center_y = int((grid_size_y - 1) / 2)
         logger.debug(f"Grid center: ({center_x}, {center_y})\n")
 
         num_players_per_layer = 6
 
         number_of_layers = (
             num_players + num_players_per_layer - 1
-        ) / num_players_per_layer
+        ) // num_players_per_layer
         logger.info(
             f"Number of players: {num_players}, number of layers needed: {number_of_layers}\n"
         )
@@ -173,8 +220,8 @@ class _GameState:
             y = int(np.round((center_y + distance_from_center * np.sin(angle))))
 
             # Update the player position in the game state and mark the grid
-            self._players[player_id] = SnakePlayer((x, y))
-            self.grid[x][y] = _TileData(tile_type=_TileType.SNAKE, player_id=player_id)
+            self._players[player_id] = SnakePlayer((x, y), player_id)
+            self._grid.add_player_at((x, y), player_id)
 
     def detect_collisions(self):
         pass
