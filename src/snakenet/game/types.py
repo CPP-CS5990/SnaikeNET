@@ -6,8 +6,8 @@ type GridSize = tuple[int, int]
 type PlayerID = str
 
 class Direction(Enum):
-    NORTH = 0
-    SOUTH = 1
-    EAST = 2
-    WEST = 3
+    NORTH   =   ( 0, -1)
+    SOUTH   =   ( 0,  1)
+    EAST    =   ( 1,  0)
+    WEST    =   (-1,  0)
 

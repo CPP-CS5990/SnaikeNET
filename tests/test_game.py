@@ -1,6 +1,6 @@
 from loguru import logger
 
-from snakenet.game.game import GameState, _TileType
+from snakenet.game.game import GameState, TileType
 from snakenet.game.types import Direction
 
 
@@ -110,7 +110,7 @@ def test__game_state_move_players_eat_food():
     for i, uid in enumerate(player_uids):
         # Place food in the next head position of each player
         next_head_position = game_state._players[uid].get_next_head_position()
-        game_state._grid._grid[next_head_position[0]][next_head_position[1]].tile_type = _TileType.FOOD  # Set tile type to FOOD
+        game_state._grid._grid[next_head_position[0]][next_head_position[1]].tile_type = TileType.FOOD  # Set tile type to FOOD
 
     game_state.move_players()
 

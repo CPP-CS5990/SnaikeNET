@@ -21,6 +21,11 @@ class Game:
     def tick(self):
         self.game_state.move_players()
 
+    def add_new_player(self) -> PlayerID:
+        player_id = self.game_state.add_new_player()
+        logger.info(f"Added new player with ID: {player_id}\n")
+        return player_id
+
     def start_game(self):
         logger.debug("Start event received, starting game loop...\n")
         if self.game_state.initialize_game_state():
@@ -38,7 +43,7 @@ class Game:
         logger.debug("Cleaning up game resources...\n")
         # Implement any necessary cleanup logic here (e.g., saving game state, closing connections, etc.)
 
-    def not_stopped(self) -> bool:
+    def is_running(self) -> bool:
         return not self._stop_signal
 
     def wait_for_game_start(self):
@@ -51,17 +56,17 @@ class Game:
         pass
 
 
-class _TileType(Enum):
+class TileType(Enum):
     EMPTY = 0
     FOOD = 1
     SNAKE = 2
 
 class TileData:
-    tile_type: _TileType
+    tile_type: TileType
     player_ids: list[PlayerID] # Multiple players can occupy the same tile temporarily during collisions
 
     def __init__(
-        self, tile_type: _TileType = _TileType.EMPTY
+        self, tile_type: TileType = TileType.EMPTY
     ):
         self.tile_type = tile_type
         self.player_ids = []
@@ -69,16 +74,16 @@ class TileData:
     def add_player(self, player_id: PlayerID):
         if player_id not in self.player_ids:
             self.player_ids.append(player_id)
-            self.tile_type = _TileType.SNAKE
+            self.tile_type = TileType.SNAKE
     
     def remove_player(self, player_id: PlayerID):
         if player_id in self.player_ids:
             self.player_ids.remove(player_id)
             if len(self.player_ids) == 0:
-                self.tile_type = _TileType.EMPTY
+                self.tile_type = TileType.EMPTY
 
     def make_food(self):
-        self.tile_type = _TileType.FOOD
+        self.tile_type = TileType.FOOD
         if len(self.player_ids) > 0:
             logger.critical(f"Attempting to place food on a tile that is currently occupied by players: {self.player_ids}!\n")
 
@@ -94,7 +99,7 @@ class _Grid:
         self._grid_size = grid_size
         self._grid = [
             [
-                TileData(tile_type=_TileType.EMPTY)
+                TileData(tile_type=TileType.EMPTY)
                 for _ in range(grid_size[1])
             ]
             for _ in range(grid_size[0])
@@ -107,13 +112,18 @@ class _Grid:
         self._grid[position[0]][position[1]].add_player(player_id)
 
     def food_at(self, position: Position) -> bool:
-        return self._grid[position[0]][position[1]].tile_type == _TileType.FOOD
+        return self._grid[position[0]][position[1]].tile_type == TileType.FOOD
 
     def get_grid_size(self) -> GridSize:
         return self._grid_size
 
     def get_tile_data(self, position: Position) -> TileData:
         return self._grid[position[0]][position[1]]
+
+    def __iter__(self):
+        for row in self._grid:
+            for tile in row:
+                yield tile
 
 class GameState:
     _players: dict[PlayerID, SnakePlayer] = {}
@@ -130,6 +140,9 @@ class GameState:
             player_id
         )
         return player_id
+
+    def get_player(self, player_id: PlayerID) -> SnakePlayer | None:
+        return self._players.get(player_id, None)
 
     def delete_player(self, player_id: PlayerID) -> bool:
         if player_id not in self._players:
@@ -156,6 +169,8 @@ class GameState:
     def get_tile_data(self, position: Position) -> TileData:
         return self._grid.get_tile_data(position)
 
+    def get_grid_iterator(self):
+        return iter(self._grid)
 
 
     # Run right before the game loop starts to initialize the game state
@@ -238,7 +253,7 @@ def create_game_thread_instance(game: Game, tick_interval: float) -> threading.T
         tick_times = collections.deque(
             maxlen=100
         )  # Keep track of the last 100 tick times for performance monitoring
-        while game.not_stopped():
+        while game.is_running():
             tick_start = time.perf_counter()
             game.tick()
             tick += 1

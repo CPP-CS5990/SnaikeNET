@@ -1,4 +1,5 @@
 # When the snake moves, we should only need to remove the tail and add a new head in the direction of movement.
+from typing import Generator, Iterator
 from snakenet.game.types import Direction, PlayerID, Position
 
 class SnakeBodySegment:
@@ -81,14 +82,15 @@ class SnakePlayer:
     def set_direction(self, direction: Direction):
         self._direction = direction
 
+    def get_direction(self) -> Direction:
+        return self._direction
+
     def get_next_head_position(self) -> Position:
-        match self._direction:
-            case Direction.NORTH:
-                return (self._head.position[0], self._head.position[1] - 1)
-            case Direction.WEST:
-                return (self._head.position[0] - 1, self._head.position[1])
-            case Direction.SOUTH:
-                return (self._head.position[0], self._head.position[1] + 1)
-            case Direction.EAST:
-                return (self._head.position[0] + 1, self._head.position[1])
+        return (self._head.position[0] + self._direction.value[0], self._head.position[1] + self._direction.value[1])
+
+    def __iter__(self) -> Iterator[Position]:
+        current = self._tail
+        while current is not None:
+            yield current.position
+            current = current.next_segment
 
