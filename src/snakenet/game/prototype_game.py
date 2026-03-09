@@ -1,6 +1,6 @@
 # AI generated prototype using the SnakeNet game engine, demonstrating a simple 2-player snake game with Pygame rendering.
 # Not intended to be fully functional, moreso to test the game engine during development. For the most part, it should just
-# be rendering the grid and responding to player input, but it may also print out when a player dies. It uses the GameState::get_grid_iterator method
+# be rendering the grid and responding to player input, but it may also print out when a player dies. It uses the Game::get_grid_iterator method
 import sys
 import pygame
 from snakenet.game.game import Game
@@ -54,8 +54,7 @@ def render_game(
     dead_set: set[PlayerID],
     font: pygame.font.Font,
 ):
-    gs = game.game_state
-    _, gy = gs.get_grid_size()
+    _, gy = game.get_grid_size()
 
     screen.fill(BG_COLOR)
 
@@ -72,7 +71,7 @@ def render_game(
     }
 
     # Draw tiles using only get_grid_iterator
-    for i, tile in enumerate(gs.get_grid_iterator()):
+    for i, tile in enumerate(game.get_grid_iterator()):
         x = i // gy
         y = i % gy
         px = x * CELL_SIZE
@@ -123,8 +122,7 @@ def main():
 
     game, player_ids = create_game(num_players=2)
     key_maps = [P1_KEYS, P2_KEYS]
-    dead_set: set[PlayerID] = set()
-    alive_last_tick: set[PlayerID] = set(player_ids)
+    alive_last_tick: set[PlayerID] = game.get_living_players()
 
     running = True
     while running:
@@ -136,30 +134,22 @@ def main():
                     running = False
                 elif event.key == pygame.K_r:
                     game.restart_game()
-                    dead_set = set()
-                    alive_last_tick = set(player_ids)
+                    alive_last_tick = game.get_living_players()
                 else:
                     for idx, km in enumerate(key_maps):
                         if event.key in km and idx < len(player_ids):
-                            player = game.game_state.get_player(player_ids[idx])
-                            if player:
-                                player.set_direction(km[event.key])
+                            game.set_player_direction(player_ids[idx], km[event.key])
 
         game.tick()
 
         # Detect newly dead players (supplemental, not used for rendering)
-        alive_now = {
-            pid
-            for pid in player_ids
-            if (p := game.game_state.get_player(pid)) and not p.is_dead()
-        }
+        alive_now = game.get_living_players()
         for pid in alive_last_tick - alive_now:
             idx = player_ids.index(pid)
             print(f"P{idx + 1} died!")
-            dead_set.add(pid)
         alive_last_tick = alive_now
 
-        render_game(screen, game, player_ids, dead_set, font)
+        render_game(screen, game, player_ids, game.get_dead_players(), font)
         pygame.display.flip()
         clock.tick(FPS)
 

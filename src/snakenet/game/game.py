@@ -5,29 +5,29 @@ from snakenet.game.game_state import GameState
 import threading
 import time
 
-from snakenet.game.types import PlayerID, GridSize
+from snakenet.game.types import PlayerID, GridSize, Direction
 
 
 class Game:
-    game_state: GameState
+    _game_state: GameState
     _start_event: threading.Event
     _stop_signal: bool = False
 
     def __init__(self, grid_size: GridSize):
         self._start_event = threading.Event()
-        self.game_state = GameState(grid_size)
+        self._game_state = GameState(grid_size)
 
     def tick(self):
-        self.game_state.move_players()
+        self._game_state.move_players()
 
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
-        player_id = self.game_state.add_new_player(player_id)
+        player_id = self._game_state.add_new_player(player_id)
         logger.info(f"Added new player with ID: {player_id}\n")
         return player_id
 
     def start_game(self):
         logger.debug("Start event received, starting game loop...\n")
-        if self.game_state.initialize_game_state():
+        if self._game_state.initialize_game_state():
             self._start_event.set()
         else:
             logger.error("Failed to initialize game state, cannot start game loop.\n")
@@ -50,8 +50,23 @@ class Game:
         self._start_event.wait()
 
     def restart_game(self):
-        self.game_state.restart_game()
+        self._game_state.restart_game()
         self._start_event.clear()
+
+    def get_grid_iterator(self):
+        return self._game_state.get_grid_iterator()
+
+    def set_player_direction(self, player_id: PlayerID, direction: Direction):
+        self._game_state.set_player_direction(player_id, direction)
+
+    def get_dead_players(self) -> set[PlayerID]:
+        return self._game_state.get_dead_players()
+
+    def get_living_players(self) -> set[PlayerID]:
+        return self._game_state.get_living_players()
+
+    def get_grid_size(self) -> GridSize:
+        return self._game_state.get_grid_size()
 
 
 def create_game_thread_instance(game: Game, tick_interval: float) -> threading.Thread:

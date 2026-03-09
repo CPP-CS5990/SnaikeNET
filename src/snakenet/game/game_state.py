@@ -5,11 +5,13 @@ from loguru import logger
 
 from snakenet.game.grid import Grid, TileData
 from snakenet.game.player import SnakePlayer
-from snakenet.game.types import PlayerID, GridSize, Position
+from snakenet.game.types import PlayerID, GridSize, Position, Direction
 
 
 class GameState:
     _players: dict[PlayerID, SnakePlayer] = {}
+    _dead_players: set[PlayerID] = set()
+    _living_players: set[PlayerID] = set()
     _grid: Grid
     _max_num_food: int = 1
 
@@ -20,9 +22,27 @@ class GameState:
         self._grid = Grid(self._grid.get_grid_size())
         old_players = list(self._players.keys())
         self._players.clear()
+        self._living_players.clear()
+        self._dead_players.clear()
         for old_player_id in old_players:
             self.add_new_player(old_player_id)
         self.initialize_game_state()
+
+    def kill_player(self, player_id: PlayerID):
+        player = self._players[player_id]
+        if player:
+            player.kill()
+            self._dead_players.add(player_id)
+            self._living_players.remove(player_id)
+            for position in player:
+                self._grid.remove_player_at(
+                    position, player_id
+                )  # Mark all tiles occupied by the player as empty on the grid
+                self._grid.place_food_at(
+                    position
+                )  # Place food on all tiles occupied by the player
+        else:
+            logger.warning("Tried killing player that doesn't exist", player_id)
 
     # Adds a new player to the game state
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
@@ -32,13 +52,22 @@ class GameState:
             (0, 0),  # Temporary position, will be set properly in initialize_game_state
             player_id,
         )
+        self._living_players.add(player_id)
         return player_id
 
-    def get_players(self):
-        return self._players
+    def set_player_direction(self, player_id: PlayerID, player_direction: Direction):
+        player = self._players[player_id]
+        if player:
+            player.set_direction(player_direction)
 
     def get_player(self, player_id: PlayerID) -> SnakePlayer | None:
         return self._players.get(player_id, None)
+
+    def get_dead_players(self) -> set[PlayerID]:
+        return set(self._dead_players)
+
+    def get_living_players(self) -> set[PlayerID]:
+        return set(self._living_players)
 
     def delete_player(self, player_id: PlayerID) -> bool:
         if player_id not in self._players:
@@ -72,14 +101,7 @@ class GameState:
                     f"Player {player_id} collided with wall at position {next_head_position} and died.\n"
                 )
                 player.remove_head()
-                player.kill()
-                for position in player:
-                    self._grid.remove_player_at(
-                        position, player_id
-                    )  # Mark all tiles occupied by the player as empty on the grid
-                    self._grid.place_food_at(
-                        position
-                    )  # Place food on all tiles occupied by the player
+                self.kill_player(player_id)
                 continue
 
             # There is an edge case where if multiple players move into the same food tile,
