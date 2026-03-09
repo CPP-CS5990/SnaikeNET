@@ -169,7 +169,7 @@ class _Grid:
 class GameState:
     _players: dict[PlayerID, SnakePlayer] = {}
     _grid: _Grid
-    _max_num_food: int
+    _max_num_food: int = 1
 
     def __init__(self, grid_size: GridSize):
         self._grid = _Grid(grid_size)
