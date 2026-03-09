@@ -3,18 +3,18 @@ import uuid
 import numpy as np
 from loguru import logger
 
-from snakenet.game.grid import _Grid, TileData
+from snakenet.game.grid import Grid, TileData
 from snakenet.game.player import SnakePlayer
 from snakenet.game.types import PlayerID, GridSize, Position
 
 
 class GameState:
     _players: dict[PlayerID, SnakePlayer] = {}
-    _grid: _Grid
+    _grid: Grid
     _max_num_food: int = 1
 
     def __init__(self, grid_size: GridSize):
-        self._grid = _Grid(grid_size)
+        self._grid = Grid(grid_size)
 
     # Adds a new player to the game state
     def add_new_player(self) -> PlayerID:

@@ -6,7 +6,7 @@ from snakenet.game.list_dict import ListDict
 from snakenet.game.types import GridSize, Position, PlayerID
 
 
-class _Grid:
+class Grid:
     _grid_size: GridSize
     _grid: list[list[TileData]]
     _available_food_positions: ListDict[Position]
