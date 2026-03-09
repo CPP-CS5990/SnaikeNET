@@ -6,6 +6,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
+
 class ListDict(Generic[T]):
     def __init__(self):
         self.item_to_position = {}
@@ -15,7 +16,7 @@ class ListDict(Generic[T]):
         if item in self.item_to_position:
             return
         self.items.append(item)
-        self.item_to_position[item] = len(self.items)-1
+        self.item_to_position[item] = len(self.items) - 1
 
     def remove_item(self, item: T):
         if item not in self.item_to_position:

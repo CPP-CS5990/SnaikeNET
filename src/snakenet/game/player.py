@@ -1,6 +1,7 @@
 # When the snake moves, we should only need to remove the tail and add a new head in the direction of movement.
-from typing import Generator, Iterator
+from typing import Iterator
 from snakenet.game.types import Direction, PlayerID, Position
+
 
 class SnakeBodySegment:
     def __init__(
@@ -44,7 +45,8 @@ class SnakePlayer:
     _head: SnakeBodySegment
     _tail: SnakeBodySegment
     _length: int
-    _direction: Direction
+    _prev_direction: Direction
+    _next_direction: Direction
     _player_id: PlayerID
     _is_alive: bool = True
 
@@ -54,7 +56,8 @@ class SnakePlayer:
         self._head: SnakeBodySegment = snake_segment
         self._tail: SnakeBodySegment = snake_segment
         self._length = 1
-        self._direction = Direction.WEST
+        self._prev_direction = Direction.WEST
+        self._next_direction = Direction.WEST
         self._player_id = player_id
 
     def get_head_position(self) -> Position:
@@ -64,6 +67,7 @@ class SnakePlayer:
         next_head_position = self.get_next_head_position()
         # Prevent moving backwards directly into the body. The greater than 1 check allows the snake to move backwards when it has length 1, which is necessary for the initial move.
         self._head = self._head.add_next(next_head_position)
+        self._prev_direction = self._next_direction
         self._length += 1
         return self._head.position
 
@@ -93,15 +97,18 @@ class SnakePlayer:
         return self._length
 
     def set_direction(self, direction: Direction):
-        if Direction.opposite(direction) == self._direction and self._length > 1:
+        if Direction.opposite(direction) == self._prev_direction and self._length > 1:
             return
-        self._direction = direction
+        self._next_direction = direction
 
     def get_direction(self) -> Direction:
-        return self._direction
+        return self._next_direction
 
     def get_next_head_position(self) -> Position:
-        return (self._head.position[0] + self._direction.value[0], self._head.position[1] + self._direction.value[1])
+        return (
+            self._head.position[0] + self._next_direction.value[0],
+            self._head.position[1] + self._next_direction.value[1],
+        )
 
     def kill(self):
         self._is_alive = False
@@ -114,4 +121,3 @@ class SnakePlayer:
         while current is not None:
             yield current.position
             current = current.next_segment
-

@@ -1,19 +1,19 @@
 import sys
 import pygame
-from snakenet.game.game import Game, GridSize, TileType
+from snakenet.game.game import Game, TileType
 from snakenet.game.types import Direction, PlayerID
 
-SCREEN_W = 1280
-SCREEN_H = 720
+SCREEN_W = 1500
+SCREEN_H = 1000
 
-GRID_COLS = 80
-GRID_ROWS = 60
+GRID_COLS = 50
+GRID_ROWS = 30
 FPS = 10
 
-CELL_SIZE = min(SCREEN_W // GRID_COLS, SCREEN_H // GRID_ROWS)  # 12 — keeps tiles square
-GAME_W = GRID_COLS * CELL_SIZE   # 960
-GAME_H = GRID_ROWS * CELL_SIZE   # 720
-SIDEBAR_W = SCREEN_W - GAME_W    # 320
+CELL_SIZE = min(SCREEN_W // GRID_COLS, SCREEN_H // GRID_ROWS)
+GAME_W = GRID_COLS * CELL_SIZE
+GAME_H = GRID_ROWS * CELL_SIZE
+SIDEBAR_W = SCREEN_W - GAME_W
 
 BG_COLOR = (15, 15, 20)
 GRID_LINE_COLOR = (30, 30, 40)
@@ -22,9 +22,9 @@ SIDEBAR_COLOR = (20, 20, 30)
 
 # One color per player slot
 SNAKE_COLORS = [
-    (80, 200, 120),   # P1 green
+    (80, 200, 120),  # P1 green
     (100, 140, 230),  # P2 blue
-    (230, 180, 60),   # P3 gold
+    (230, 180, 60),  # P3 gold
     (200, 100, 200),  # P4 purple
 ]
 
@@ -43,8 +43,13 @@ P2_KEYS = {
 }
 
 
-def render_game(screen: pygame.Surface, game: Game, player_ids: list[PlayerID],
-                dead_set: set[PlayerID], font: pygame.font.Font):
+def render_game(
+    screen: pygame.Surface,
+    game: Game,
+    player_ids: list[PlayerID],
+    dead_set: set[PlayerID],
+    font: pygame.font.Font,
+):
     gs = game.game_state
     _, gy = gs.get_grid_size()
 
@@ -58,7 +63,9 @@ def render_game(screen: pygame.Surface, game: Game, player_ids: list[PlayerID],
         ly = row * CELL_SIZE
         pygame.draw.line(screen, GRID_LINE_COLOR, (0, ly), (GAME_W, ly))
 
-    pid_to_color = {pid: SNAKE_COLORS[i % len(SNAKE_COLORS)] for i, pid in enumerate(player_ids)}
+    pid_to_color = {
+        pid: SNAKE_COLORS[i % len(SNAKE_COLORS)] for i, pid in enumerate(player_ids)
+    }
 
     # Draw tiles using only get_grid_iterator
     for i, tile in enumerate(gs.get_grid_iterator()):
@@ -89,7 +96,9 @@ def render_game(screen: pygame.Surface, game: Game, player_ids: list[PlayerID],
         status = "ALIVE" if alive else "DEAD"
         swatch_rect = pygame.Rect(GAME_W + 16, y_off + 1, 10, 10)
         pygame.draw.rect(screen, color, swatch_rect)
-        label = small.render(f"P{i + 1}  {status}", True, color if alive else (100, 100, 100))
+        label = small.render(
+            f"P{i + 1}  {status}", True, color if alive else (100, 100, 100)
+        )
         screen.blit(label, (GAME_W + 32, y_off))
         y_off += 22
 
@@ -136,7 +145,8 @@ def main():
 
         # Detect newly dead players (supplemental, not used for rendering)
         alive_now = {
-            pid for pid in player_ids
+            pid
+            for pid in player_ids
             if (p := game.game_state.get_player(pid)) and not p.is_dead()
         }
         for pid in alive_last_tick - alive_now:

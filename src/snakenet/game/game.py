@@ -10,6 +10,7 @@ import time
 
 from snakenet.game.types import PlayerID, Position, GridSize
 
+
 class Game:
     game_state: GameState
     _start_event: threading.Event
@@ -56,18 +57,20 @@ class Game:
         self._start_event.clear()
         pass
 
+
 class TileType(Enum):
     EMPTY = 0
     FOOD = 1
     SNAKE = 2
 
+
 class TileData:
     tile_type: TileType
-    player_ids: list[PlayerID] # Multiple players can occupy the same tile temporarily during collisions
+    player_ids: list[
+        PlayerID
+    ]  # Multiple players can occupy the same tile temporarily during collisions
 
-    def __init__(
-        self, tile_type: TileType = TileType.EMPTY
-    ):
+    def __init__(self, tile_type: TileType = TileType.EMPTY):
         self.tile_type = tile_type
         self.player_ids = []
 
@@ -75,7 +78,7 @@ class TileData:
         if player_id not in self.player_ids:
             self.player_ids.append(player_id)
             self.tile_type = TileType.SNAKE
-    
+
     def remove_player(self, player_id: PlayerID):
         if player_id in self.player_ids:
             self.player_ids.remove(player_id)
@@ -85,25 +88,26 @@ class TileData:
     def make_food(self):
         self.tile_type = TileType.FOOD
         if len(self.player_ids) > 0:
-            logger.critical(f"Attempting to place food on a tile that is currently occupied by players: {self.player_ids}!\n")
+            logger.critical(
+                f"Attempting to place food on a tile that is currently occupied by players: {self.player_ids}!\n"
+            )
+
 
 class Collision:
-    collidor: PlayerID # player id of the collidor
-    collidee: PlayerID # player id of the collidee
+    collidor: PlayerID  # player id of the collidor
+    collidee: PlayerID  # player id of the collidee
+
 
 class _Grid:
     _grid_size: GridSize
     _grid: list[list[TileData]]
     _available_food_positions: ListDict[Position]
     _num_food_tiles: int = 0
-    
+
     def __init__(self, grid_size: GridSize):
         self._grid_size = grid_size
         self._grid = [
-            [
-                TileData(tile_type=TileType.EMPTY)
-                for _ in range(grid_size[1])
-            ]
+            [TileData(tile_type=TileType.EMPTY) for _ in range(grid_size[1])]
             for _ in range(grid_size[0])
         ]
         self._available_food_positions = ListDict()
@@ -124,7 +128,9 @@ class _Grid:
             self._num_food_tiles -= 1
             self._available_food_positions.add_item(position)
         else:
-            logger.warning(f"Attempting to remove food from a tile that does not contain food at position {position}!\n")
+            logger.warning(
+                f"Attempting to remove food from a tile that does not contain food at position {position}!\n"
+            )
 
     def food_at(self, position: Position) -> bool:
         return self._grid[position[0]][position[1]].tile_type == TileType.FOOD
@@ -159,6 +165,7 @@ class _Grid:
             for tile in row:
                 yield tile
 
+
 class GameState:
     _players: dict[PlayerID, SnakePlayer] = {}
     _grid: _Grid
@@ -171,8 +178,8 @@ class GameState:
     def add_new_player(self) -> PlayerID:
         player_id = str(uuid.uuid4())
         self._players[player_id] = SnakePlayer(
-            (0, 0), # Temporary position, will be set properly in initialize_game_state
-            player_id
+            (0, 0),  # Temporary position, will be set properly in initialize_game_state
+            player_id,
         )
         return player_id
 
@@ -184,13 +191,20 @@ class GameState:
             return False
         while self._players[player_id].get_length() > 0:
             tail_position = self._players[player_id].remove_tail()
-            self._grid.remove_player_at(tail_position, player_id) # Mark the old tail position as empty on the grid
+            self._grid.remove_player_at(
+                tail_position, player_id
+            )  # Mark the old tail position as empty on the grid
         del self._players[player_id]
         return True
 
     def position_outside_grid(self, position: Position) -> bool:
         grid_size_x, grid_size_y = self._grid.get_grid_size()
-        return position[0] < 0 or position[0] >= grid_size_x or position[1] < 0 or position[1] >= grid_size_y
+        return (
+            position[0] < 0
+            or position[0] >= grid_size_x
+            or position[1] < 0
+            or position[1] >= grid_size_y
+        )
 
     def move_players(self):
         num_food_eaten_this_tick = 0
@@ -201,26 +215,38 @@ class GameState:
 
             # Check for collisions with walls
             if self.position_outside_grid(next_head_position):
-                logger.info(f"Player {player_id} collided with wall at position {next_head_position} and died.\n")
+                logger.info(
+                    f"Player {player_id} collided with wall at position {next_head_position} and died.\n"
+                )
                 player.remove_head()
                 player.kill()
                 for position in player:
-                    self._grid.remove_player_at(position, player_id) # Mark all tiles occupied by the player as empty on the grid
-                    self._grid.place_food_at(position) # Place food on all tiles occupied by the player
+                    self._grid.remove_player_at(
+                        position, player_id
+                    )  # Mark all tiles occupied by the player as empty on the grid
+                    self._grid.place_food_at(
+                        position
+                    )  # Place food on all tiles occupied by the player
                 continue
 
             # There is an edge case where if multiple players move into the same food tile,
             # whichever player's move is processed first will eat the food and grow
             # Obviously, if multiple players are moving into the same tile, there will be a collision
-            # but 1 player will still get to eat the food and grow which means that players new 
+            # but 1 player will still get to eat the food and grow which means that players new
             # tail will be collidable for the same tick
             if not self._grid.food_at(next_head_position):
                 tail_position = player.remove_tail()
-                self._grid.remove_player_at(tail_position, player_id)  # Mark the old tail position as empty on the grid
+                self._grid.remove_player_at(
+                    tail_position, player_id
+                )  # Mark the old tail position as empty on the grid
             else:
-                logger.info(f"Player {player_id} ate food at position {next_head_position} and grew to length {player.get_length()}.\n")
+                logger.info(
+                    f"Player {player_id} ate food at position {next_head_position} and grew to length {player.get_length()}.\n"
+                )
 
-            self._grid.add_player_at(next_head_position, player_id)  # Mark the new head position as occupied by the player on the grid
+            self._grid.add_player_at(
+                next_head_position, player_id
+            )  # Mark the new head position as occupied by the player on the grid
 
             while self._grid.get_num_food() < self._max_num_food:
                 food_position = self._grid.get_random_available_food_position()
@@ -229,7 +255,6 @@ class GameState:
                 else:
                     logger.warning("No available positions to place new food!\n")
                     break
-
 
     def get_grid_size(self) -> GridSize:
         return self._grid.get_grid_size()
@@ -270,8 +295,8 @@ class GameState:
         num_players = len(self._players)
         grid_size_x, grid_size_y = self.get_grid_size()
         grid_size_padded = (
-            int(grid_size_x * 0.65),
-            int(grid_size_y * 0.65),
+            min(grid_size_x, grid_size_y) * 0.65,
+            min(grid_size_x, grid_size_y) * 0.65,
         )
         logger.debug(
             f"Initializing player positions for {num_players} players on a grid of size ({grid_size_x}, {grid_size_y}) (padded size: {grid_size_padded})...\n"
