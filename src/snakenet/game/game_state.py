@@ -10,6 +10,7 @@ from snakenet.game.types import PlayerID, GridSize, Position, Direction
 
 class GameState:
     _players: dict[PlayerID, SnakePlayer] = {}
+    _kills: dict[PlayerID, PlayerID] = {}
     _dead_players: set[PlayerID] = set()
     _living_players: set[PlayerID] = set()
     _grid: Grid
@@ -24,13 +25,17 @@ class GameState:
         self._players.clear()
         self._living_players.clear()
         self._dead_players.clear()
+        self._kills.clear()
         for old_player_id in old_players:
             self.add_new_player(old_player_id)
         self.initialize_game_state()
 
-    def kill_player(self, player_id: PlayerID):
+    def kill_player(self, player_id: PlayerID, killer: PlayerID | None = None):
+        if killer is None:
+            killer = player_id
         player = self._players[player_id]
         if player:
+            self._kills[player_id] = killer
             player.kill()
             self._dead_players.add(player_id)
             self._living_players.remove(player_id)
@@ -72,7 +77,7 @@ class GameState:
     def delete_player(self, player_id: PlayerID) -> bool:
         if player_id not in self._players:
             return False
-        while self._players[player_id].get_length() > 0:
+        while len(self._players[player_id]) > 0:
             tail_position = self._players[player_id].remove_tail()
             self._grid.remove_player_at(
                 tail_position, player_id
@@ -89,7 +94,8 @@ class GameState:
             or position[1] >= grid_size_y
         )
 
-    def move_players(self):
+    # Handles player moves and kills the player if they hit a wall
+    def handle_player_moves(self):
         for player_id, player in self._players.items():
             if player.is_dead():
                 continue
@@ -116,20 +122,30 @@ class GameState:
                 )  # Mark the old tail position as empty on the grid
             else:
                 logger.info(
-                    f"Player {player_id} ate food at position {next_head_position} and grew to length {player.get_length()}.\n"
+                    f"Player {player_id} ate food at position {next_head_position} and grew to length {len(player)}.\n"
                 )
 
             self._grid.add_player_at(
                 next_head_position, player_id
             )  # Mark the new head position as occupied by the player on the grid
 
-            while self._grid.get_num_food() < self._max_num_food:
-                food_position = self._grid.get_random_available_food_position()
-                if food_position is not None:
-                    self._grid.place_food_at(food_position)
-                else:
-                    logger.warning("No available positions to place new food!\n")
-                    break
+    def handle_collisions(self):
+        for player_id, player in self._players.items():
+            if player.is_dead():
+                continue
+
+            if player.collided_with_self():
+                self.kill_player(player_id)
+
+
+    def handle_food_spawning(self):
+        while self._grid.get_num_food() < self._max_num_food:
+            food_position = self._grid.get_random_available_food_position()
+            if food_position is not None:
+                self._grid.place_food_at(food_position)
+            else:
+                logger.warning("No available positions to place new food!\n")
+                break
 
     def get_grid_size(self) -> GridSize:
         return self._grid.get_grid_size()

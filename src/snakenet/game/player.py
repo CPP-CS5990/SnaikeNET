@@ -93,9 +93,6 @@ class SnakePlayer:
     def get_tail_position(self) -> Position:
         return self._tail.position
 
-    def get_length(self) -> int:
-        return self._length
-
     def set_direction(self, direction: Direction):
         if Direction.opposite(direction) == self._prev_direction and self._length > 1:
             return
@@ -116,8 +113,24 @@ class SnakePlayer:
     def is_dead(self) -> bool:
         return not self._is_alive
 
+    def collided_with_self(self) -> bool:
+        if len(self) == 1:
+            return False
+
+        segment = self._head.prev_segment
+        while segment is not None:
+            if segment.position == self._head.position:
+                return True
+            segment = segment.prev_segment
+        return False
+
     def __iter__(self) -> Iterator[Position]:
         current = self._tail
         while current is not None:
             yield current.position
             current = current.next_segment
+
+    def __len__(self) -> int:
+        return self._length
+
+

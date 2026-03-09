@@ -18,7 +18,9 @@ class Game:
         self._game_state = GameState(grid_size)
 
     def tick(self):
-        self._game_state.move_players()
+        self._game_state.handle_player_moves()
+        self._game_state.handle_collisions()
+        self._game_state.handle_food_spawning()
 
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         player_id = self._game_state.add_new_player(player_id)

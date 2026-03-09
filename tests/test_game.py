@@ -72,7 +72,7 @@ def test__game_state_move_players():
             f"Player {i + 1} initial position: {game_state._players[uid].get_head_position()}"
         )
 
-    game_state.move_players()
+    game_state.handle_player_moves()
 
     player_new_positions = [
         game_state._players[uid].get_head_position() for uid in player_uids
@@ -87,7 +87,7 @@ def test__game_state_move_players():
 
     # ensure that all players are stil the same length and that the tail is in the correct position
     for i, uid in enumerate(player_uids):
-        assert game_state._players[uid].get_length() == 1, (
+        assert len(game_state._players[uid]) == 1, (
             f"Player {i + 1} length changed after moving!"
         )
         assert (
@@ -143,7 +143,7 @@ def test__game_state_move_players_eat_food():
             next_head_position[1]
         ].tile_type = TileType.FOOD  # Set tile type to FOOD
 
-    game_state.move_players()
+    game_state.handle_player_moves()
 
     player_new_positions = [
         game_state._players[uid].get_head_position() for uid in player_uids
@@ -158,7 +158,7 @@ def test__game_state_move_players_eat_food():
 
     # ensure that all players are now length 2 and that the tail is in the correct position
     for i, uid in enumerate(player_uids):
-        assert game_state._players[uid].get_length() == 2, (
+        assert len(game_state._players[uid]), (
             f"Player {i + 1} length did not increase after eating food!"
         )
         assert (
