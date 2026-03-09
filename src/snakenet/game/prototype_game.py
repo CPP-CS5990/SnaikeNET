@@ -1,143 +1,36 @@
-# WARNING: This is mostly AI generated code. This is just to prototype the backend game logic with a pygame frontend. It also allows for manual testing
-# No need to polish this code
+# AI generated prototype using the SnakeNet game engine, demonstrating a simple 2-player snake game with Pygame rendering.
+# Not intended to be fully functional, moreso to test the game engine during development. For the most part, it should just
+# be rendering the grid and responding to player input, but it may also print out when a player dies. It uses the Game::get_grid_iterator method
 import sys
 import pygame
-from snakenet.game.game import Game, PlayerID, GridSize, TileType
-from snakenet.game.types import Direction
+from snakenet.game.game import Game
+from snakenet.game.grid import TileType
+from snakenet.game.types import Direction, PlayerID
 
-# Colors
+SCREEN_W = 1500
+SCREEN_H = 1000
+
+GRID_COLS = 60
+GRID_ROWS = 60
+FPS = 8
+
+CELL_SIZE = min(SCREEN_W // GRID_COLS, SCREEN_H // GRID_ROWS)
+GAME_W = GRID_COLS * CELL_SIZE
+GAME_H = GRID_ROWS * CELL_SIZE
+SIDEBAR_W = SCREEN_W - GAME_W
+
 BG_COLOR = (15, 15, 20)
 GRID_LINE_COLOR = (30, 30, 40)
 FOOD_COLOR = (220, 50, 50)
-FOOD_GLOW = (255, 80, 80)
-TEXT_COLOR = (200, 200, 210)
-DEAD_OVERLAY = (255, 60, 60, 80)
+SIDEBAR_COLOR = (20, 20, 30)
 
-SNAKE_PALETTES = [
-    {"body": (80, 200, 120), "head": (50, 240, 100)},   # green
-    {"body": (100, 140, 230), "head": (70, 120, 255)},   # blue
-    {"body": (230, 180, 60), "head": (255, 210, 40)},     # gold
-    {"body": (200, 100, 200), "head": (240, 120, 240)},   # purple
+# One color per player slot
+SNAKE_COLORS = [
+    (80, 200, 120),  # P1 green
+    (100, 140, 230),  # P2 blue
+    (230, 180, 60),  # P3 gold
+    (200, 100, 200),  # P4 purple
 ]
-
-CELL_SIZE = 24
-SIDEBAR_WIDTH = 220
-GRID_COLS = 100
-GRID_ROWS = 80
-FPS = 3  # game ticks per second
-
-
-def render_game(screen: pygame.Surface, game: Game, player_ids: list[PlayerID], font: pygame.font.Font):
-    gs = game.game_state
-    gx, gy = gs.get_grid_size()
-    game_area_w = gx * CELL_SIZE
-    game_area_h = gy * CELL_SIZE
-
-    screen.fill(BG_COLOR)
-
-    # ── Grid lines ──
-    for x in range(gx + 1):
-        pygame.draw.line(screen, GRID_LINE_COLOR, (x * CELL_SIZE, 0), (x * CELL_SIZE, game_area_h))
-    for y in range(gy + 1):
-        pygame.draw.line(screen, GRID_LINE_COLOR, (0, y * CELL_SIZE), (game_area_w, y * CELL_SIZE))
-
-    # ── Tiles ──
-    for i, tile in enumerate(gs.get_grid_iterator()):
-        if tile.tile_type == TileType.FOOD:
-            x, y = i % gx, i // gx
-            rect = pygame.Rect(x * CELL_SIZE + 4, y * CELL_SIZE + 4, CELL_SIZE - 8, CELL_SIZE - 8)
-            pygame.draw.ellipse(screen, FOOD_GLOW, rect.inflate(8, 8))
-            pygame.draw.ellipse(screen, FOOD_COLOR, rect)
-
-    # ── Snakes ──
-    for idx, pid in enumerate(player_ids):
-        player = gs.get_player(pid)
-        if player is None:
-            continue
-        palette = SNAKE_PALETTES[idx % len(SNAKE_PALETTES)]
-
-        for i, (sx, sy) in enumerate(player):
-            rect = pygame.Rect(sx * CELL_SIZE + 1, sy * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2)
-            if i == 0:
-                # Head: brighter, rounded
-                color = palette["head"]
-                pygame.draw.rect(screen, color, rect, border_radius=8)
-                # Eyes
-                cx, cy_px = rect.centerx, rect.centery
-                dx, dy = player.get_direction().value
-                eye_off = 4
-                if dx == 0:  # vertical movement — eyes side by side
-                    pygame.draw.circle(screen, (20, 20, 20), (cx - eye_off, cy_px + dy * 3), 3)
-                    pygame.draw.circle(screen, (20, 20, 20), (cx + eye_off, cy_px + dy * 3), 3)
-                else:  # horizontal movement — eyes stacked
-                    pygame.draw.circle(screen, (20, 20, 20), (cx + dx * 3, cy_px - eye_off), 3)
-                    pygame.draw.circle(screen, (20, 20, 20), (cx + dx * 3, cy_px + eye_off), 3)
-            else:
-                # Body: gradient fade toward tail
-                t = i / max(i, 1)
-                fade = 1.0 - t * 0.5
-                color = tuple(int(c * fade) for c in palette["body"])
-                pygame.draw.rect(screen, color, rect, border_radius=4)
-
-    # ── Sidebar ──
-    sidebar_x = game_area_w + 16
-    sidebar_rect = pygame.Rect(game_area_w, 0, SIDEBAR_WIDTH, game_area_h)
-    pygame.draw.rect(screen, (20, 20, 28), sidebar_rect)
-    pygame.draw.line(screen, (40, 40, 55), (game_area_w, 0), (game_area_w, game_area_h), 2)
-
-    title_surf = font.render("SNAKENET", True, (180, 180, 200))
-    screen.blit(title_surf, (sidebar_x, 20))
-
-    y_offset = 60
-    small_font = pygame.font.SysFont("monospace", 14)
-
-    for idx, pid in enumerate(player_ids):
-        player = gs.get_player(pid)
-        if player is None:
-            continue
-        palette = SNAKE_PALETTES[idx % len(SNAKE_PALETTES)]
-        status = "ALIVE"
-        color = palette["head"]
-
-        # Color swatch
-        pygame.draw.rect(screen, color, (sidebar_x, y_offset, 12, 12), border_radius=2)
-
-        label = f"P{idx + 1}: {player}pts  {status}"
-        label_surf = small_font.render(label, True, color)
-        screen.blit(label_surf, (sidebar_x + 20, y_offset - 1))
-        y_offset += 28
-
-    # Controls
-    y_offset += 20
-    controls = [
-        "─── CONTROLS ───",
-        "P1: W A S D",
-        "P2: Arrow Keys",
-        "",
-        "R: Restart",
-        "ESC: Quit",
-    ]
-    for line in controls:
-        surf = small_font.render(line, True, (100, 100, 120))
-        screen.blit(surf, (sidebar_x, y_offset))
-        y_offset += 20
-
-    # Game over overlay
-    overlay = pygame.Surface((game_area_w, game_area_h), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 140))
-    screen.blit(overlay, (0, 0))
-    big_font = pygame.font.SysFont("monospace", 48, bold=True)
-    go_surf = big_font.render("GAME OVER", True, (255, 80, 80))
-    go_rect = go_surf.get_rect(center=(game_area_w // 2, game_area_h // 2 - 20))
-    screen.blit(go_surf, go_rect)
-    restart_surf = small_font.render("Press R to restart", True, (180, 180, 180))
-    r_rect = restart_surf.get_rect(center=(game_area_w // 2, game_area_h // 2 + 30))
-    screen.blit(restart_surf, r_rect)
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Key mappings
-# ──────────────────────────────────────────────────────────────────────
 
 P1_KEYS = {
     pygame.K_w: Direction.NORTH,
@@ -154,33 +47,82 @@ P2_KEYS = {
 }
 
 
-# ──────────────────────────────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────────────────────────────
+def render_game(
+    screen: pygame.Surface,
+    game: Game,
+    player_ids: list[PlayerID],
+    dead_set: set[PlayerID],
+    font: pygame.font.Font,
+):
+    _, gy = game.get_grid_size()
 
-def create_and_start_game(num_players: int = 2) -> tuple[Game, list[PlayerID]]:
-    grid_size: GridSize = (GRID_COLS, GRID_ROWS)
-    game = Game(grid_size)
-    player_ids = [game.game_state.add_new_player() for _ in range(num_players)] # add players to game state and keep track of their IDs
+    screen.fill(BG_COLOR)
+
+    # Grid lines for tile borders
+    for col in range(GRID_COLS + 1):
+        lx = col * CELL_SIZE
+        pygame.draw.line(screen, GRID_LINE_COLOR, (lx, 0), (lx, GAME_H))
+    for row in range(GRID_ROWS + 1):
+        ly = row * CELL_SIZE
+        pygame.draw.line(screen, GRID_LINE_COLOR, (0, ly), (GAME_W, ly))
+
+    pid_to_color = {
+        pid: SNAKE_COLORS[i % len(SNAKE_COLORS)] for i, pid in enumerate(player_ids)
+    }
+
+    # Draw tiles using only get_grid_iterator
+    for i, tile in enumerate(game.get_grid_iterator()):
+        x = i // gy
+        y = i % gy
+        px = x * CELL_SIZE
+        py = y * CELL_SIZE
+
+        if tile.tile_type == TileType.FOOD:
+            rect = pygame.Rect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4)
+            pygame.draw.ellipse(screen, FOOD_COLOR, rect)
+        elif tile.tile_type == TileType.SNAKE and tile.player_ids:
+            color = pid_to_color.get(tile.player_ids[0], (200, 200, 200))
+            rect = pygame.Rect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2)
+            pygame.draw.rect(screen, color, rect)
+
+    # Sidebar
+    pygame.draw.rect(screen, SIDEBAR_COLOR, (GAME_W, 0, SIDEBAR_W, SCREEN_H))
+
+    title = font.render("SNAKENET", True, (180, 180, 200))
+    screen.blit(title, (GAME_W + 16, 16))
+
+    y_off = 50
+    small = pygame.font.SysFont("monospace", 13)
+    for i, pid in enumerate(player_ids):
+        color = SNAKE_COLORS[i % len(SNAKE_COLORS)]
+        alive = pid not in dead_set
+        status = "ALIVE" if alive else "DEAD"
+        swatch_rect = pygame.Rect(GAME_W + 16, y_off + 1, 10, 10)
+        pygame.draw.rect(screen, color, swatch_rect)
+        label = small.render(
+            f"P{i + 1}  {status}", True, color if alive else (100, 100, 100)
+        )
+        screen.blit(label, (GAME_W + 32, y_off))
+        y_off += 22
+
+
+def create_game(num_players: int = 2) -> tuple[Game, list[PlayerID]]:
+    game = Game((GRID_COLS, GRID_ROWS))
+    player_ids = [game.add_new_player() for _ in range(num_players)]
     game.start_game()
     return game, player_ids
 
 
 def main():
     pygame.init()
-
-    game_area_w = GRID_COLS * CELL_SIZE
-    game_area_h = GRID_ROWS * CELL_SIZE
-    screen_w = game_area_w + SIDEBAR_WIDTH
-    screen_h = game_area_h
-
-    screen = pygame.display.set_mode((screen_w, screen_h))
-    pygame.display.set_caption("SnakeNet — Pygame")
+    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    pygame.display.set_caption("SnakeNet Prototype")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("monospace", 22, bold=True)
+    font = pygame.font.SysFont("monospace", 14)
 
-    game, player_ids = create_and_start_game(num_players=2)
+    game, player_ids = create_game(num_players=2)
     key_maps = [P1_KEYS, P2_KEYS]
+    alive_last_tick: set[PlayerID] = game.get_living_players()
 
     running = True
     while running:
@@ -191,19 +133,23 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_r:
-                    game, player_ids = create_and_start_game(num_players=2)
+                    game.restart_game()
+                    alive_last_tick = game.get_living_players()
                 else:
-                    # Route key presses to the correct player
                     for idx, km in enumerate(key_maps):
                         if event.key in km and idx < len(player_ids):
-                            player = game.game_state.get_player(player_ids[idx])
-                            if player:
-                                player.set_direction(km[event.key])
+                            game.set_player_direction(player_ids[idx], km[event.key])
 
-        if game.is_running():
-            game.tick()
+        game.tick()
 
-        render_game(screen, game, player_ids, font)
+        # Detect newly dead players (supplemental, not used for rendering)
+        alive_now = game.get_living_players()
+        for pid in alive_last_tick - alive_now:
+            idx = player_ids.index(pid)
+            print(f"P{idx + 1} died!")
+        alive_last_tick = alive_now
+
+        render_game(screen, game, player_ids, game.get_dead_players(), font)
         pygame.display.flip()
         clock.tick(FPS)
 

@@ -50,7 +50,6 @@ from snakenet.server_commands import (
     GameServerCommandInterface,
     create_console_thread_instance,
 )
-from snakenet.fastapi_server_commands import FastAPIServerCommands
 
 TICK_RATE = 24
 TICK_INTERVAL = 1 / TICK_RATE
@@ -86,8 +85,8 @@ def main():
     console_thread_instance = create_console_thread_instance(command_interface)
 
     # Create FastAPI server instance with command interface
-    if False:  # TODO: Implement when HTTP server is ready
-        fastapi_command_interface = FastAPIServerCommands(command_interface)
+    # if False:  # TODO: Implement when HTTP server is ready
+    #     fastapi_command_interface = FastAPIServerCommands(command_interface)
 
     # Start threads
     game_thread_instance.start()

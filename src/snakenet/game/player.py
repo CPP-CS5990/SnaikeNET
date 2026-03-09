@@ -1,6 +1,7 @@
 # When the snake moves, we should only need to remove the tail and add a new head in the direction of movement.
-from typing import Generator, Iterator
+from typing import Iterator
 from snakenet.game.types import Direction, PlayerID, Position
+
 
 class SnakeBodySegment:
     def __init__(
@@ -30,7 +31,7 @@ class SnakeBodySegment:
             raise ValueError("This segment has no next segment")
         return self.next_segment
 
-    def prev(self) -> SnakeBodySegment | None:
+    def prev(self) -> SnakeBodySegment:
         if self.prev_segment is None:
             raise ValueError("This segment has no previous segment")
         return self.prev_segment
@@ -44,8 +45,10 @@ class SnakePlayer:
     _head: SnakeBodySegment
     _tail: SnakeBodySegment
     _length: int
-    _direction: Direction
+    _prev_direction: Direction
+    _next_direction: Direction
     _player_id: PlayerID
+    _is_alive: bool = True
 
     def __init__(self, initial_position: Position, player_id: PlayerID):
         # Begins at length 1, so the head and tail are the same tile.
@@ -53,14 +56,18 @@ class SnakePlayer:
         self._head: SnakeBodySegment = snake_segment
         self._tail: SnakeBodySegment = snake_segment
         self._length = 1
-        self._direction = Direction.WEST
+        self._prev_direction = Direction.WEST
+        self._next_direction = Direction.WEST
         self._player_id = player_id
 
     def get_head_position(self) -> Position:
         return self._head.position
 
     def add_head(self) -> Position:
-        self._head = self._head.add_next(self.get_next_head_position())
+        next_head_position = self.get_next_head_position()
+        # Prevent moving backwards directly into the body. The greater than 1 check allows the snake to move backwards when it has length 1, which is necessary for the initial move.
+        self._head = self._head.add_next(next_head_position)
+        self._prev_direction = self._next_direction
         self._length += 1
         return self._head.position
 
@@ -73,20 +80,49 @@ class SnakePlayer:
         self._length -= 1
         return old_tail_position
 
+    def remove_head(self) -> Position:
+        if self._length == 0:
+            raise ValueError("Cannot remove head from an empty snake")
+        old_head_position = self._head.position
+        self._head = self._head.prev()
+        if self._head is not None:
+            self._head.next_segment = None
+        self._length -= 1
+        return old_head_position
+
     def get_tail_position(self) -> Position:
         return self._tail.position
 
-    def get_length(self) -> int:
-        return self._length
-
     def set_direction(self, direction: Direction):
-        self._direction = direction
+        if Direction.opposite(direction) == self._prev_direction and self._length > 1:
+            return
+        self._next_direction = direction
 
     def get_direction(self) -> Direction:
-        return self._direction
+        return self._next_direction
 
     def get_next_head_position(self) -> Position:
-        return (self._head.position[0] + self._direction.value[0], self._head.position[1] + self._direction.value[1])
+        return (
+            self._head.position[0] + self._next_direction.value[0],
+            self._head.position[1] + self._next_direction.value[1],
+        )
+
+    def kill(self):
+        self._is_alive = False
+
+    def is_dead(self) -> bool:
+        return not self._is_alive
+
+    def collided_with_self(self) -> bool:
+        if len(self) == 1:
+            return False
+
+        segment = self._head.prev_segment
+        while segment is not None:
+            if segment.position == self._head.position:
+                return True
+            segment = segment.prev_segment
+        return False
 
     def __iter__(self) -> Iterator[Position]:
         current = self._tail
@@ -94,3 +130,5 @@ class SnakePlayer:
             yield current.position
             current = current.next_segment
 
+    def __len__(self) -> int:
+        return self._length
