@@ -3,7 +3,8 @@
 # be rendering the grid and responding to player input, but it may also print out when a player dies. It uses the GameState::get_grid_iterator method
 import sys
 import pygame
-from snakenet.game.game import Game, TileType
+from snakenet.game.game import Game
+from snakenet.game.grid import TileType
 from snakenet.game.types import Direction, PlayerID
 
 SCREEN_W = 1500

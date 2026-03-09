@@ -1,6 +1,7 @@
 from loguru import logger
 
-from snakenet.game.game import GameState, TileType
+from snakenet.game.game_state import GameState
+from snakenet.game.grid import TileType
 from snakenet.game.types import Direction
 
 
