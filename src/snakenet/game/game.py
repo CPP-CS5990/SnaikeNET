@@ -207,7 +207,6 @@ class GameState:
         )
 
     def move_players(self):
-        num_food_eaten_this_tick = 0
         for player_id, player in self._players.items():
             if player.is_dead():
                 continue
