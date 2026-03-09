@@ -30,7 +30,7 @@ class SnakeBodySegment:
             raise ValueError("This segment has no next segment")
         return self.next_segment
 
-    def prev(self) -> SnakeBodySegment | None:
+    def prev(self) -> SnakeBodySegment:
         if self.prev_segment is None:
             raise ValueError("This segment has no previous segment")
         return self.prev_segment
@@ -46,6 +46,7 @@ class SnakePlayer:
     _length: int
     _direction: Direction
     _player_id: PlayerID
+    _is_alive: bool = True
 
     def __init__(self, initial_position: Position, player_id: PlayerID):
         # Begins at length 1, so the head and tail are the same tile.
@@ -60,7 +61,9 @@ class SnakePlayer:
         return self._head.position
 
     def add_head(self) -> Position:
-        self._head = self._head.add_next(self.get_next_head_position())
+        next_head_position = self.get_next_head_position()
+        # Prevent moving backwards directly into the body. The greater than 1 check allows the snake to move backwards when it has length 1, which is necessary for the initial move.
+        self._head = self._head.add_next(next_head_position)
         self._length += 1
         return self._head.position
 
@@ -73,6 +76,16 @@ class SnakePlayer:
         self._length -= 1
         return old_tail_position
 
+    def remove_head(self) -> Position:
+        if self._length == 0:
+            raise ValueError("Cannot remove head from an empty snake")
+        old_head_position = self._head.position
+        self._head = self._head.prev()
+        if self._head is not None:
+            self._head.next_segment = None
+        self._length -= 1
+        return old_head_position
+
     def get_tail_position(self) -> Position:
         return self._tail.position
 
@@ -80,6 +93,8 @@ class SnakePlayer:
         return self._length
 
     def set_direction(self, direction: Direction):
+        if Direction.opposite(direction) == self._direction and self._length > 1:
+            return
         self._direction = direction
 
     def get_direction(self) -> Direction:
@@ -87,6 +102,12 @@ class SnakePlayer:
 
     def get_next_head_position(self) -> Position:
         return (self._head.position[0] + self._direction.value[0], self._head.position[1] + self._direction.value[1])
+
+    def kill(self):
+        self._is_alive = False
+
+    def is_dead(self) -> bool:
+        return not self._is_alive
 
     def __iter__(self) -> Iterator[Position]:
         current = self._tail

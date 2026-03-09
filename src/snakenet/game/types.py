@@ -11,3 +11,13 @@ class Direction(Enum):
     EAST    =   ( 1,  0)
     WEST    =   (-1,  0)
 
+    def opposite(self) -> Direction:
+        match self:
+            case Direction.NORTH:
+                return Direction.SOUTH
+            case Direction.SOUTH:
+                return Direction.NORTH
+            case Direction.EAST:
+                return Direction.WEST
+            case Direction.WEST:
+                return Direction.EAST
