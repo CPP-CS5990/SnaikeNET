@@ -1,3 +1,6 @@
+# AI generated prototype using the SnakeNet game engine, demonstrating a simple 2-player snake game with Pygame rendering.
+# Not intended to be fully functional, moreso to test the game engine during development. For the most part, it should just
+# be rendering the grid and responding to player input, but it may also print out when a player dies. It uses the GameState::get_grid_iterator method
 import sys
 import pygame
 from snakenet.game.game import Game, TileType
