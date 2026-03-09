@@ -22,7 +22,9 @@ class Grid:
 
     # To award kills, a player needs to be designated as the killer,
     # there may be multiple players at any given position.
-    def tile_occupied_by_other(self, player_id: PlayerID, position: Position) -> PlayerID | None:
+    def tile_occupied_by_other(
+        self, player_id: PlayerID, position: Position
+    ) -> PlayerID | None:
         players = self._grid[position[0]][position[1]].player_ids
         for other_player in players:
             if other_player != player_id:

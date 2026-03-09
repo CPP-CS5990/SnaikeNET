@@ -147,9 +147,8 @@ class GameState:
                     killed_players[player_id] = other
 
         # Kill based on the detected collisions
-        for killed, killer  in killed_players.items():
+        for killed, killer in killed_players.items():
             self.kill_player(killed, killer)
-
 
     def handle_food_spawning(self):
         while self._grid.get_num_food() < self._max_num_food:

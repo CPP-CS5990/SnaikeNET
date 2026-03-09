@@ -132,5 +132,3 @@ class SnakePlayer:
 
     def __len__(self) -> int:
         return self._length
-
-
