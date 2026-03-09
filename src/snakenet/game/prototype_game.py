@@ -10,9 +10,9 @@ from snakenet.game.types import Direction, PlayerID
 SCREEN_W = 1500
 SCREEN_H = 1000
 
-GRID_COLS = 30
-GRID_ROWS = 15
-FPS = 10
+GRID_COLS = 60
+GRID_ROWS = 60
+FPS = 8
 
 CELL_SIZE = min(SCREEN_W // GRID_COLS, SCREEN_H // GRID_ROWS)
 GAME_W = GRID_COLS * CELL_SIZE

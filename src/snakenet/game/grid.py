@@ -20,6 +20,15 @@ class Grid:
         ]
         self._available_food_positions = ListDict()
 
+    # To award kills, a player needs to be designated as the killer,
+    # there may be multiple players at any given position.
+    def tile_occupied_by_other(self, player_id: PlayerID, position: Position) -> PlayerID | None:
+        players = self._grid[position[0]][position[1]].player_ids
+        for other_player in players:
+            if other_player != player_id:
+                return other_player
+        return None
+
     def remove_player_at(self, position: Position, player_id: PlayerID):
         self._grid[position[0]][position[1]].remove_player(player_id)
         self._available_food_positions.add_item(position)

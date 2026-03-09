@@ -130,12 +130,25 @@ class GameState:
             )  # Mark the new head position as occupied by the player on the grid
 
     def handle_collisions(self):
+        # killed -> killer
+        killed_players: dict[PlayerID, PlayerID] = {}
+
+        # Detect the killing collisions
         for player_id, player in self._players.items():
             if player.is_dead():
                 continue
 
             if player.collided_with_self():
-                self.kill_player(player_id)
+                killed_players[player_id] = player_id
+            else:
+                head_position = player.get_head_position()
+                other = self._grid.tile_occupied_by_other(player_id, head_position)
+                if other is not None:
+                    killed_players[player_id] = other
+
+        # Kill based on the detected collisions
+        for killed, killer  in killed_players.items():
+            self.kill_player(killed, killer)
 
 
     def handle_food_spawning(self):
@@ -173,7 +186,7 @@ class GameState:
 
     def _initialize_food_positions(self):
         self._grid.fill_available_food_positions()
-        self._max_num_food = max(1, len(self._players) // 2)
+        self._max_num_food = max(1, len(self._players) * 3)
         for _ in range(self._max_num_food):
             food_position = self._grid.get_random_available_food_position()
             if food_position is not None:
