@@ -135,7 +135,7 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_r:
-                    game, player_ids = create_game(num_players=2)
+                    game.restart_game()
                     dead_set = set()
                     alive_last_tick = set(player_ids)
                 else:

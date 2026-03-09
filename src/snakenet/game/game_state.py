@@ -16,14 +16,26 @@ class GameState:
     def __init__(self, grid_size: GridSize):
         self._grid = Grid(grid_size)
 
+    def restart_game(self):
+        self._grid = Grid(self._grid.get_grid_size())
+        old_players = list(self._players.keys())
+        self._players.clear()
+        for old_player_id in old_players:
+            self.add_new_player(old_player_id)
+        self.initialize_game_state()
+
     # Adds a new player to the game state
-    def add_new_player(self) -> PlayerID:
-        player_id = str(uuid.uuid4())
+    def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
+        if player_id is None:
+            player_id = str(uuid.uuid4())
         self._players[player_id] = SnakePlayer(
             (0, 0),  # Temporary position, will be set properly in initialize_game_state
             player_id,
         )
         return player_id
+
+    def get_players(self):
+        return self._players
 
     def get_player(self, player_id: PlayerID) -> SnakePlayer | None:
         return self._players.get(player_id, None)

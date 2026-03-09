@@ -20,8 +20,8 @@ class Game:
     def tick(self):
         self.game_state.move_players()
 
-    def add_new_player(self) -> PlayerID:
-        player_id = self.game_state.add_new_player()
+    def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
+        player_id = self.game_state.add_new_player(player_id)
         logger.info(f"Added new player with ID: {player_id}\n")
         return player_id
 
@@ -50,9 +50,8 @@ class Game:
         self._start_event.wait()
 
     def restart_game(self):
-        self = Game(self.game_state.get_grid_size())
+        self.game_state.restart_game()
         self._start_event.clear()
-        pass
 
 
 def create_game_thread_instance(game: Game, tick_interval: float) -> threading.Thread:
