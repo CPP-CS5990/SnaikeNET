@@ -1,11 +1,11 @@
 import collections
 from loguru import logger
 
-from snakenet.game.game_state import GameState
+from snaikenet.game.game_state import GameState
 import threading
 import time
 
-from snakenet.game.types import PlayerID, GridSize, Direction
+from snaikenet.game.types import PlayerID, GridSize, Direction
 
 
 class Game:

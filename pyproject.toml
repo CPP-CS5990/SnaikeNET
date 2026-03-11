@@ -1,5 +1,5 @@
 [project]
-name = "SnakeNet"
+name = "SnaikeNET"
 version = "0.1.0"
 description = "A multiplayer snake game"
 readme = "README.md"
@@ -16,9 +16,9 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-server = "snakenet.__main__:main"
-visualize_gamestate = "snakenet.game.visualize_gamestate:main"
-prototype = "snakenet.game.prototype_game:main"
+server = "snaikenet.__main__:main"
+visualize_gamestate = "snaikenet.game.visualize_gamestate:main"
+prototype = "snaikenet.game.prototype_game:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

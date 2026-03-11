@@ -2,8 +2,8 @@ from enum import Enum
 
 from loguru import logger
 
-from snakenet.game.list_dict import ListDict
-from snakenet.game.types import GridSize, Position, PlayerID
+from snaikenet.game.list_dict import ListDict
+from snaikenet.game.types import GridSize, Position, PlayerID
 
 
 class Grid:

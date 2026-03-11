@@ -3,9 +3,9 @@ import uuid
 import numpy as np
 from loguru import logger
 
-from snakenet.game.grid import Grid, TileData
-from snakenet.game.player import SnakePlayer
-from snakenet.game.types import PlayerID, GridSize, Position, Direction
+from snaikenet.game.grid import Grid, TileData
+from snaikenet.game.player import SnakePlayer
+from snaikenet.game.types import PlayerID, GridSize, Position, Direction
 
 
 class GameState:

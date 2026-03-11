@@ -1,6 +1,6 @@
 from numpy.random import randint
 
-from snakenet.game.game_state import GameState
+from snaikenet.game.game_state import GameState
 
 
 def main():

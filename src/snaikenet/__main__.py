@@ -42,11 +42,11 @@
 # On the UDP Server, we will listen for messages from players:
 #
 import sys
-from snakenet.game.game import Game, create_game_thread_instance
-from snakenet.parse_args import parse_args
+from snaikenet.game.game import Game, create_game_thread_instance
+from snaikenet.parse_args import parse_args
 from loguru import logger
 
-from snakenet.server_commands import (
+from snaikenet.server_commands import (
     GameServerCommandInterface,
     create_console_thread_instance,
 )

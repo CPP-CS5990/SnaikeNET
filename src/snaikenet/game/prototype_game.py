@@ -1,11 +1,11 @@
-# AI generated prototype using the SnakeNet game engine, demonstrating a simple 2-player snake game with Pygame rendering.
+# AI generated prototype using the Snaikenet game engine, demonstrating a simple 2-player snake game with Pygame rendering.
 # Not intended to be fully functional, moreso to test the game engine during development. For the most part, it should just
 # be rendering the grid and responding to player input, but it may also print out when a player dies. It uses the Game::get_grid_iterator method
 import sys
 import pygame
-from snakenet.game.game import Game
-from snakenet.game.grid import TileType
-from snakenet.game.types import Direction, PlayerID
+from snaikenet.game.game import Game
+from snaikenet.game.grid import TileType
+from snaikenet.game.types import Direction, PlayerID
 
 SCREEN_W = 1500
 SCREEN_H = 1000
@@ -88,7 +88,7 @@ def render_game(
     # Sidebar
     pygame.draw.rect(screen, SIDEBAR_COLOR, (GAME_W, 0, SIDEBAR_W, SCREEN_H))
 
-    title = font.render("SNAKENET", True, (180, 180, 200))
+    title = font.render("SNAIKENET", True, (180, 180, 200))
     screen.blit(title, (GAME_W + 16, 16))
 
     y_off = 50
@@ -116,7 +116,7 @@ def create_game(num_players: int = 2) -> tuple[Game, list[PlayerID]]:
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
-    pygame.display.set_caption("SnakeNet Prototype")
+    pygame.display.set_caption("Snaikenet Prototype")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("monospace", 14)
 
