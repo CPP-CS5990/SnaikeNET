@@ -85,6 +85,10 @@ def create_game_thread_instance(game: Game, tick_interval: float) -> threading.T
         while game.is_running():
             tick_start = time.perf_counter()
             game.tick()
+            viewports = game.get_viewports() # Generate viewport for each player
+            metadata = game.get_metadata()
+            datagrams = codec.encode(viewports, metadata) # Encode viewports and metadata into messages for players
+            app.broadcast_datagrams(datagrams) # Send messages to players
             tick += 1
             tick_times.append(time.perf_counter() - tick_start)
 
