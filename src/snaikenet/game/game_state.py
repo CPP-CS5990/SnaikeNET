@@ -3,7 +3,7 @@ import uuid
 import numpy as np
 from loguru import logger
 
-from snaikenet.game.grid import Grid, TileData
+from snaikenet.game.grid import Grid, TileData, GridStructure
 from snaikenet.game.player import SnakePlayer
 from snaikenet.game.types import PlayerID, GridSize, Position, Direction
 
@@ -15,8 +15,9 @@ class GameState:
     _living_players: set[PlayerID] = set()
     _grid: Grid
     _max_num_food: int = 1
+    _viewport_distance_from_center: tuple[int, int]
 
-    def __init__(self, grid_size: GridSize):
+    def __init__(self, grid_size: GridSize, viewport_distance_from_center: tuple[int, int] = (14, 14)):
         self._grid = Grid(grid_size)
 
     def restart_game(self):
@@ -244,5 +245,5 @@ class GameState:
             self._players[player_id] = SnakePlayer((x, y), player_id)
             self._grid.add_player_at((x, y), player_id)
 
-    def detect_collisions(self):
-        pass
+    def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
+        return self._grid.get_viewport(self._players.get(player_id).get_head_position(), self._viewport_distance_from_center)
