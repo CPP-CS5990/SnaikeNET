@@ -5,31 +5,21 @@ import json
 
 
 def decode_direction(data: bytes) -> Direction | None:
-    direction = data.decode().strip().lower()
+    direction = data[0:1]
     match direction:
-        case "north":
+        case Direction.NORTH.value:
             return Direction.NORTH
-        case "south":
+        case Direction.SOUTH.value:
             return Direction.SOUTH
-        case "east":
+        case Direction.EAST.value:
             return Direction.EAST
-        case "west":
+        case Direction.WEST.value:
             return Direction.WEST
         case _:
             return None
 
-
 def encode_direction(direction: Direction) -> bytes:
-    match direction:
-        case Direction.NORTH:
-            return b"north"
-        case Direction.SOUTH:
-            return b"south"
-        case Direction.EAST:
-            return b"east"
-        case Direction.WEST:
-            return b"west"
-
+    return bytes(direction.as_index())
 
 def encode_game_state(game_state: dict[str, PlayerView]) -> dict[str, bytes]:
     encoded_game_state = {}
