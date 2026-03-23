@@ -23,6 +23,7 @@ class GameState:
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
         self._grid = Grid(grid_size)
+        self._viewport_distance_from_center = viewport_distance_from_center
 
     def restart_game(self):
         self._grid = Grid(self._grid.get_grid_size())
@@ -254,3 +255,55 @@ class GameState:
             self._players.get(player_id).get_head_position(),
             self._viewport_distance_from_center,
         )
+
+    def get_player_viewports(self):
+        return {
+            player_id: self._grid.get_viewport(
+                self._players.get(player_id).get_head_position(),
+                self._viewport_distance_from_center,
+            )
+            for player_id in self._players
+        }
+
+    def get_player_states(self) -> dict[PlayerID, PlayerView]:
+        return {
+            player_id: self.get_player_state(player_id) for player_id in self._players
+        }
+
+    def get_player_state(self, player_id: PlayerID) -> PlayerView | None:
+        player = self._players.get(player_id)
+        if player is None:
+            return None
+
+        return PlayerView(
+            viewport_size=(
+                self._viewport_distance_from_center[0] * 2 + 1,
+                self._viewport_distance_from_center[1] * 2 + 1,
+            ),
+            length=len(player),
+            kills=sum(1 for killer in self._kills.values() if killer == player_id),
+            is_alive=not player.is_dead(),
+            viewport=self.get_player_viewport(player_id),
+        )
+
+
+class PlayerView:
+    viewport_size: tuple[int, int]
+    length: int
+    kills: int
+    is_alive: bool
+    viewport: GridStructure
+
+    def __init__(
+        self,
+        viewport_size: tuple[int, int],
+        length: int,
+        kills: int,
+        is_alive: bool,
+        viewport: GridStructure,
+    ):
+        self.viewport_size = viewport_size
+        self.length = length
+        self.kills = kills
+        self.is_alive = is_alive
+        self.viewport = viewport

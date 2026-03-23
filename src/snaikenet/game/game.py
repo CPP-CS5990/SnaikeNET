@@ -1,7 +1,9 @@
 import collections
 from loguru import logger
 
-from snaikenet.game.game_state import GameState
+from snaikenet.game.game_state import GameState, PlayerView
+from snaikenet_network.protocol import protocol
+from snaikenet_network.server.server import SnaikenetServer
 import threading
 import time
 
@@ -78,6 +80,12 @@ class Game:
     def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
         return self._game_state.get_player_viewport(player_id)
 
+    def get_player_viewports(self) -> dict[PlayerID, GridStructure]:
+        return self._game_state.get_player_viewports()
+
+    def get_player_states(self) -> dict[PlayerID, PlayerView]:
+        return self._game_state.get_player_states()
+
     def get_player_viewport_iterator(self, player_id: PlayerID):
         viewport = self.get_player_viewport(player_id)
         for row in viewport:
@@ -87,8 +95,32 @@ class Game:
 
 def create_game_thread_instance(game: Game, tick_interval: float) -> threading.Thread:
     def game_loop():
+        game_lock = threading.Lock()
+
+        def on_received_datagram(client_id: str, data: bytes):
+            # Handle incoming datagram from clients (e.g., player input)
+            logger.debug(f"Received datagram from client {client_id}: {data}\n")
+            direction = protocol.decode_direction(data)
+            if direction is not None:
+                with game_lock:
+                    game.set_player_direction(
+                        client_id, direction
+                    )  # Placeholder, replace with actual direction decoding
+            else:
+                logger.debug(
+                    f"Received invalid datagram from client {client_id}: {data}\n"
+                )
+
+        def on_player_connected(client_id: str):
+            logger.info(f"Player connected with client ID: {client_id}\n")
+            with game_lock:
+                game.add_new_player(client_id)
+
+        server = SnaikenetServer(on_received_datagram, on_player_connected)
         logger.info("Game thread started, waiting for start signal...\n")
         game.wait_for_game_start()
+        # Once the game starts, stop accepting new clients
+        server.set_keep_accepting_new_clients(False)
 
         logger.info("Start signal received, entering game loop...\n")
         tick = 0
@@ -96,9 +128,15 @@ def create_game_thread_instance(game: Game, tick_interval: float) -> threading.T
         tick_times = collections.deque(
             maxlen=100
         )  # Keep track of the last 100 tick times for performance monitoring
+
         while game.is_running():
             tick_start = time.perf_counter()
-            game.tick()
+            with game_lock:
+                game.tick()
+
+            player_states = game.get_player_states()
+            player_states_encoded = protocol.encode_game_state(player_states)
+            server.broadcast(player_states_encoded)
             tick += 1
             tick_times.append(time.perf_counter() - tick_start)
 

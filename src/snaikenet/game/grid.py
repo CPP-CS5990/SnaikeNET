@@ -133,6 +133,7 @@ class TileType(Enum):
     WALL = 1
     FOOD = 2
     SNAKE = 3
+    OTHER_SNAKE = 4  # Used for distinguishing the player's own snake from other snakes in the viewport
 
 
 class TileData:
