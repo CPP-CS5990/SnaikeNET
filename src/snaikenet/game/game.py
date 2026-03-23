@@ -14,7 +14,11 @@ class Game:
     _start_event: threading.Event
     _stop_signal: bool = False
 
-    def __init__(self, grid_size: GridSize, viewport_distance_from_center: tuple[int, int] = (14, 14)):
+    def __init__(
+        self,
+        grid_size: GridSize,
+        viewport_distance_from_center: tuple[int, int] = (14, 14),
+    ):
         self._start_event = threading.Event()
         self._game_state = GameState(grid_size, viewport_distance_from_center)
 

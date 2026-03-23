@@ -17,7 +17,11 @@ class GameState:
     _max_num_food: int = 1
     _viewport_distance_from_center: tuple[int, int]
 
-    def __init__(self, grid_size: GridSize, viewport_distance_from_center: tuple[int, int] = (14, 14)):
+    def __init__(
+        self,
+        grid_size: GridSize,
+        viewport_distance_from_center: tuple[int, int] = (14, 14),
+    ):
         self._grid = Grid(grid_size)
 
     def restart_game(self):
@@ -246,4 +250,7 @@ class GameState:
             self._grid.add_player_at((x, y), player_id)
 
     def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
-        return self._grid.get_viewport(self._players.get(player_id).get_head_position(), self._viewport_distance_from_center)
+        return self._grid.get_viewport(
+            self._players.get(player_id).get_head_position(),
+            self._viewport_distance_from_center,
+        )

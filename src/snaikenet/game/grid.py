@@ -7,6 +7,7 @@ from snaikenet.game.types import GridSize, Position, PlayerID
 
 type GridStructure = list[list[TileData]]
 
+
 class Grid:
     _grid_size: GridSize
     _grid: GridStructure
@@ -87,24 +88,28 @@ class Grid:
 
     # Gets a viewport of the grid centered around a given position
     # When viewport goes out of bounds, it should fill the remaining tiles with TileType.WALL
-    def get_viewport(self, center_position: Position, distance_from_center: tuple[int, int]) -> GridStructure:
+    def get_viewport(
+        self, center_position: Position, distance_from_center: tuple[int, int]
+    ) -> GridStructure:
         viewport = []
-        for x in range(center_position[0] - distance_from_center[0], center_position[0] + distance_from_center[0] + 1):
+        for x in range(
+            center_position[0] - distance_from_center[0],
+            center_position[0] + distance_from_center[0] + 1,
+        ):
             row = []
             for y in range(
                 center_position[1] - distance_from_center[1],
                 center_position[1] + distance_from_center[1] + 1,
             ):
-                if (
-                    0 <= x < self._grid_size[0]
-                    and 0 <= y < self._grid_size[1]
-                ):
+                if 0 <= x < self._grid_size[0] and 0 <= y < self._grid_size[1]:
                     row.append(self._grid[x][y])
                 else:
                     wall_tile = TileData(tile_type=TileType.WALL)
                     row.append(wall_tile)
             viewport.append(row)
-        logger.debug(f"Generated viewport for center position {center_position} with distance {distance_from_center}:\n{self.as_string(viewport)}\n")
+        logger.debug(
+            f"Generated viewport for center position {center_position} with distance {distance_from_center}:\n{self.as_string(viewport)}\n"
+        )
         return viewport
 
     def as_string(self, grid: GridStructure) -> str:
