@@ -5,6 +5,7 @@ from snaikenet.game.game_state import GameState
 import threading
 import time
 
+from snaikenet.game.grid import GridStructure
 from snaikenet.game.types import PlayerID, GridSize, Direction
 
 
@@ -13,9 +14,13 @@ class Game:
     _start_event: threading.Event
     _stop_signal: bool = False
 
-    def __init__(self, grid_size: GridSize):
+    def __init__(
+        self,
+        grid_size: GridSize,
+        viewport_distance_from_center: tuple[int, int] = (14, 14),
+    ):
         self._start_event = threading.Event()
-        self._game_state = GameState(grid_size)
+        self._game_state = GameState(grid_size, viewport_distance_from_center)
 
     def tick(self):
         self._game_state.handle_player_moves()
@@ -69,6 +74,15 @@ class Game:
 
     def get_grid_size(self) -> GridSize:
         return self._game_state.get_grid_size()
+
+    def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
+        return self._game_state.get_player_viewport(player_id)
+
+    def get_player_viewport_iterator(self, player_id: PlayerID):
+        viewport = self.get_player_viewport(player_id)
+        for row in viewport:
+            for tile in row:
+                yield tile
 
 
 def create_game_thread_instance(game: Game, tick_interval: float) -> threading.Thread:
