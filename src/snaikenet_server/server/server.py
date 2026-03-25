@@ -23,8 +23,8 @@ class SnaikenetServer:
     """
 
     _host: str
-    _udp_port: int
-    _tcp_port: int
+    _port: int
+    _port: int
     # UUID -> external (host, port)
     _clients: dict[str, tuple[str, int] | None]
     # (host, port) -> UUID, for reverse lookup when receiving UDP datagrams
@@ -42,14 +42,12 @@ class SnaikenetServer:
         on_received_datagram: Callable[[str, bytes]],
         on_new_client: Callable[[str]],
         host="localhost",
-        udp_port=8888,
-        tcp_port=9999,
+        port=8888
     ):
         self._on_received_datagram = on_received_datagram
         self._on_new_client = on_new_client
         self._host = host
-        self._udp_port = udp_port
-        self._tcp_port = tcp_port
+        self._port = port
         self._clients = {}  # Track connected clients
         self._addr_to_uuid = {}
         self._keep_accepting_new_clients = True
@@ -68,14 +66,14 @@ class SnaikenetServer:
         loop = asyncio.get_running_loop()
 
         await loop.create_datagram_endpoint(
-            lambda: self._UdpProtocol(self), local_addr=(self._host, self._udp_port)
+            lambda: self._UdpProtocol(self), local_addr=(self._host, self._port)
         )
-        logger.info(f"UDP server started on {self._host}:{self._udp_port}")
+        logger.info(f"UDP server started on {self._host}:{self._port}")
 
         self._tcp_server = await asyncio.start_server(
-            self._handle_registration, self._host, self._tcp_port
+            self._handle_registration, self._host, self._port
         )
-        logger.info(f"TCP server started on {self._host}:{self._tcp_port}")
+        logger.info(f"TCP server started on {self._host}:{self._port}")
 
     async def stop(self):
         if self._udp_transport:
@@ -181,7 +179,7 @@ class SnaikenetServer:
 
     def _udp_hole_punch_response(self, client_id: str) -> bytes:
         return self._to_json(
-            {"status": "ok", "uuid": client_id, "udp_port": self._udp_port}
+            {"status": "ok", "uuid": client_id, "port": self._port}
         )
 
     def _udp_hole_punch_success_response(

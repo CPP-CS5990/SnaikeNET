@@ -2,8 +2,8 @@ from enum import Enum
 
 from loguru import logger
 
-from snaikenet.game.list_dict import ListDict
-from snaikenet.game.types import GridSize, Position, PlayerID
+from snaikenet_server.game.list_dict import ListDict
+from snaikenet_server.game.types import GridSize, Position, PlayerID
 
 type GridStructure = list[list[TileData]]
 
@@ -133,7 +133,6 @@ class TileType(Enum):
     WALL = 1
     FOOD = 2
     SNAKE = 3
-    OTHER_SNAKE = 4  # Used for distinguishing the player's own snake from other snakes in the viewport
 
 
 class TileData:
@@ -142,9 +141,11 @@ class TileData:
         PlayerID
     ]  # Multiple players can occupy the same tile temporarily during collisions
 
-    def __init__(self, tile_type: TileType = TileType.EMPTY):
+    def __init__(self, tile_type: TileType = TileType.EMPTY, player_ids=None):
+        if player_ids is None:
+            player_ids = []
         self.tile_type = tile_type
-        self.player_ids = []
+        self.player_ids = player_ids
 
     def add_player(self, player_id: PlayerID):
         if player_id not in self.player_ids:

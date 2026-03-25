@@ -1,14 +1,14 @@
 import collections
 from loguru import logger
 
-from snaikenet.game.game_state import GameState, PlayerView
-from snaikenet_network.protocol import protocol
-from snaikenet_network.server.server import SnaikenetServer
+from snaikenet_server.game.game_state import GameState, PlayerView
+from snaikenet_client.protocol import protocol
+from snaikenet_client.server.server import SnaikenetServer
 import threading
 import time
 
-from snaikenet.game.grid import GridStructure
-from snaikenet.game.types import PlayerID, GridSize, Direction
+from snaikenet_server.game.grid import GridStructure
+from snaikenet_server.game.types import PlayerID, GridSize, Direction
 
 
 class Game:

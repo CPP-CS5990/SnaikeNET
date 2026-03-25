@@ -1,6 +1,6 @@
 from numpy.random import randint
 
-from snaikenet.game.game_state import GameState
+from snaikenet_server.game.game_state import GameState
 
 
 def main():

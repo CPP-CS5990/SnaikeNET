@@ -1,6 +1,6 @@
 # When the snake moves, we should only need to remove the tail and add a new head in the direction of movement.
 from typing import Iterator
-from snaikenet.game.types import Direction, PlayerID, Position
+from snaikenet_server.game.types import Direction, PlayerID, Position
 
 
 class SnakeBodySegment:

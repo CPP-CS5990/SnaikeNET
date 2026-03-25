@@ -1,4 +1,4 @@
-from snaikenet.server_commands import GameServerCommandInterface
+from snaikenet_server.server_commands import GameServerCommandInterface
 from fastapi import FastAPI
 
 

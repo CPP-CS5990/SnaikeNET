@@ -1,8 +1,8 @@
 from loguru import logger
 
-from snaikenet.game.game_state import GameState
-from snaikenet.game.grid import TileType
-from snaikenet.game.types import Direction
+from snaikenet_server.game.game_state import GameState
+from snaikenet_server.game.grid import TileType
+from snaikenet_server.game.types import Direction
 
 
 def test__game_state_player_initialization():
