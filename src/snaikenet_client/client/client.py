@@ -14,12 +14,12 @@ class SnaikenetClient:
     _udp_transport: asyncio.DatagramTransport
     _server_host: str
     _server_port: int
-    _on_received_datagram: Callable[ClientGameStateFrame]
+    _on_received_datagram: Callable[[ClientGameStateFrame]]
     _client_uuid: str | None = None
     _direction: ClientDirection | None = None
     _send_task: asyncio.Task | None = None
 
-    def __init__(self, on_received_datagram: Callable[ClientGameStateFrame], server_port: int = 8888, server_host: str = 'localhost', send_interval_ms: int = 50):
+    def __init__(self, on_received_datagram: Callable[[ClientGameStateFrame]] = lambda: None, server_port: int = 8888, server_host: str = 'localhost', send_interval_ms: int = 50):
         self._send_interval = send_interval_ms / 1000.0
         self._server_host = server_host
         self._server_port = server_port

@@ -24,7 +24,6 @@ class SnaikenetServer:
 
     _host: str
     _port: int
-    _port: int
     # UUID -> external (host, port)
     _clients: dict[str, tuple[str, int] | None]
     # (host, port) -> UUID, for reverse lookup when receiving UDP datagrams
@@ -39,8 +38,8 @@ class SnaikenetServer:
 
     def __init__(
         self,
-        on_received_datagram: Callable[[str, bytes]],
-        on_new_client: Callable[[str]],
+        on_received_datagram: Callable[[str, bytes]] = lambda: None,
+        on_new_client: Callable[[str]] = lambda: None,
         host="localhost",
         port=8888
     ):
@@ -51,6 +50,12 @@ class SnaikenetServer:
         self._clients = {}  # Track connected clients
         self._addr_to_uuid = {}
         self._keep_accepting_new_clients = True
+
+    def get_host(self) -> str:
+        return self._host
+
+    def get_port(self) -> int:
+        return self._port
 
     def set_keep_accepting_new_clients(self, keep_accepting_new_clients: bool):
         self._keep_accepting_new_clients = keep_accepting_new_clients
