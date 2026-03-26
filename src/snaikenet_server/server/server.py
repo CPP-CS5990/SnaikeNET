@@ -5,6 +5,8 @@ from collections.abc import Callable
 
 from loguru import logger
 
+from snaikenet_server.server.connected_clients import ConnectedClients
+
 
 class SnaikenetServer:
     """
@@ -24,10 +26,7 @@ class SnaikenetServer:
 
     _host: str
     _port: int
-    # UUID -> external (host, port)
-    _clients: dict[str, tuple[str, int] | None]
-    # (host, port) -> UUID, for reverse lookup when receiving UDP datagrams
-    _addr_to_uuid: dict[tuple[str, int], str]
+    _connected_clients: ConnectedClients
     # Temporary storage for pending hole-punching requests: UUID -> Future that will be set with (host, port) when UDP datagram is received
     _pending: dict[str, asyncio.Future[tuple[str, int]]]
     _udp_transport: asyncio.DatagramTransport | None = None
@@ -38,8 +37,8 @@ class SnaikenetServer:
 
     def __init__(
         self,
-        on_received_datagram: Callable[[str, bytes]] = lambda: None,
-        on_new_client: Callable[[str]] = lambda: None,
+        on_received_datagram: Callable[[str, bytes]] = lambda _, __: None,
+        on_new_client: Callable[[str]] = lambda _: None,
         host="localhost",
         port=8888
     ):
@@ -47,9 +46,9 @@ class SnaikenetServer:
         self._on_new_client = on_new_client
         self._host = host
         self._port = port
-        self._clients = {}  # Track connected clients
-        self._addr_to_uuid = {}
+        self._connected_clients = ConnectedClients()
         self._keep_accepting_new_clients = True
+        self._pending = {}
 
     def get_host(self) -> str:
         return self._host
@@ -63,9 +62,15 @@ class SnaikenetServer:
     # Broadcast message to connected clients using their registered NAT-mapped addresses
     def broadcast(self, client_data: dict[str, bytes]):
         for uuid, data in client_data.items():
-            dest = self._clients.get(uuid)
+            dest = self._connected_clients.get_client_addr(uuid)
             if dest is not None:
                 self._udp_transport = self._udp_transport or None
+
+    def broadcast_all(self, data: bytes):
+        for dest in self._connected_clients.get_client_addrs():
+            if dest is not None:
+                self._udp_transport = self._udp_transport or None
+                self._udp_transport.sendto(data, dest)
 
     async def start(self):
         loop = asyncio.get_running_loop()
@@ -79,6 +84,15 @@ class SnaikenetServer:
             self._handle_registration, self._host, self._port
         )
         logger.info(f"TCP server started on {self._host}:{self._port}")
+
+    def get_clients_str(self) -> str:
+        return "Clients connected: " + ", ".join(f"{client.client_id} at {addr}" for client, addr in self._connected_clients.items())
+
+    async def server_forever(self):
+        if self._tcp_server is None:
+            raise RuntimeError("Server not started yet")
+        async with self._tcp_server:
+            await self._tcp_server.serve_forever()
 
     async def stop(self):
         if self._udp_transport:
@@ -94,10 +108,14 @@ class SnaikenetServer:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
         peer = writer.get_extra_info("peername")
+        logger.info(f"Received connection from {peer}")
+
         try:
             raw = await asyncio.wait_for(reader.readline(), timeout=5.0)
             if not raw:
                 return
+
+            logger.debug(f"Received registration request from {peer}: {raw.decode().strip()}")
 
             msg = json.loads(raw.decode().strip())
             req_type = msg.get("type")
@@ -109,22 +127,21 @@ class SnaikenetServer:
                         await writer.drain()
                         return
                     client_id = str(uuid4())
-                    self._clients[client_id] = None
-                    logger.info(
-                        f"New client registered with UUID {client_id} from {peer}"
+                    self._connected_clients.remove_client_by_id(client_id)  # Clear any old registration with same UUID just in case, should be very unlikely
+                    logger.debug(
+                        f"New client registering with UUID {client_id} from TCP {peer}"
                     )
                 case "reconnect":
                     client_id = msg.get("uuid")
-                    if client_id not in self._clients:
+                    if self._connected_clients.has_client_id(client_id):
                         writer.write(self._error_response("Unknown UUID"))
                         await writer.drain()
                         return
 
-                    old_addr = self._clients[client_id]
+                    old_addr = self._connected_clients.get_client_addr(client_id)
                     if old_addr:
-                        self._addr_to_uuid.pop(old_addr, None)
-                        self._clients[client_id] = None
-
+                        self._connected_clients.remove_client_by_addr(old_addr)
+                        self._connected_clients.remove_client_by_id(client_id)  # Clear old registration so that the new one can be registered after hole punching completes
                     logger.info(
                         f"Client with UUID {client_id} is reconnecting from {peer}"
                     )
@@ -137,7 +154,8 @@ class SnaikenetServer:
             fut = loop.create_future()
             self._pending[client_id] = fut
 
-            writer.write(self._udp_hole_punch_response(client_id))
+            writer.write(self._udp_hole_punch_request(client_id))
+            logger.debug(f"Sending hole punch request to client {client_id} at TCP {peer}")
             await writer.drain()
 
             try:
@@ -148,15 +166,14 @@ class SnaikenetServer:
                 await self._pending.pop(client_id, None)
 
                 if req_type == "new":
-                    self._clients[client_id] = None
+                    self._connected_clients.remove_client_by_id(client_id)  # Clear any registration for this client since hole punch failed
                 logger.warning(f"Hole punch timed out for client {client_id}")
                 writer.write(self._error_response("Hole punch timed out"))
                 await writer.drain()
                 return
 
             # At this point, we have already handled if this is a reconnect and cleared the old address, so we can just register the new address
-            self._clients[client_id] = external_addr
-            self._addr_to_uuid[external_addr] = client_id
+            self._connected_clients.register_client(client_id, external_addr)
             if req_type == "new":
                 self._on_new_client(client_id)
             logger.info(
@@ -182,7 +199,7 @@ class SnaikenetServer:
     def _error_response(self, reason: str) -> bytes:
         return self._to_json({"status": "error", "reason": reason})
 
-    def _udp_hole_punch_response(self, client_id: str) -> bytes:
+    def _udp_hole_punch_request(self, client_id: str) -> bytes:
         return self._to_json(
             {"status": "ok", "uuid": client_id, "port": self._port}
         )
@@ -206,14 +223,15 @@ class SnaikenetServer:
 
             # Hole-punch ping
             if msg in self._server._pending:
+                logger.info(f"Received hole punch ping from {addr} for client {msg}")
                 fut = self._server._pending.pop(msg)
                 if not fut.done():
                     fut.set_result(addr)
                 return
 
             # Regular traffic
-            if addr in self._server._addr_to_uuid:
-                uuid = self._server._addr_to_uuid[addr]
+            if self._server._connected_clients.has_client_addr(addr):
+                uuid = self._server._connected_clients.get_client_id(addr)
                 self._server._on_received_datagram(uuid, data)
                 logger.debug(f"Received UDP message from {uuid} at {addr}: {msg}")
             else:

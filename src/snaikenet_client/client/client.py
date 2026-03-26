@@ -14,38 +14,42 @@ class SnaikenetClient:
     _udp_transport: asyncio.DatagramTransport
     _server_host: str
     _server_port: int
-    _on_received_datagram: Callable[[ClientGameStateFrame]]
+    _on_receive_game_state_frame: Callable[[ClientGameStateFrame]]
     _client_uuid: str | None = None
     _direction: ClientDirection | None = None
     _send_task: asyncio.Task | None = None
 
-    def __init__(self, on_received_datagram: Callable[[ClientGameStateFrame]] = lambda: None, server_port: int = 8888, server_host: str = 'localhost', send_interval_ms: int = 50):
+    def __init__(self, on_receive_game_state_frame: Callable[[ClientGameStateFrame]] = lambda _: None, server_port: int = 8888, server_host: str = 'localhost', send_interval_ms: int = 50):
         self._send_interval = send_interval_ms / 1000.0
         self._server_host = server_host
         self._server_port = server_port
-        self._on_received_datagram = on_received_datagram
+        self._on_receive_game_state_frame = on_receive_game_state_frame
 
     async def start(self):
         loop = asyncio.get_running_loop()
-        await loop.create_datagram_endpoint(lambda: self._UdpProtocol(self))
+        await loop.create_datagram_endpoint(lambda: self._UdpProtocol(self), remote_addr=(self._server_host, self._server_port))
 
         await self.connect()
 
-        self._send_task, _ = asyncio.create_task(self._send_direction_loop())
+        self._send_task = asyncio.create_task(self._send_direction_loop())
 
     async def connect(self):
         # TCP Registration:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(5)  # Set a timeout for the connection attempt
+            logger.debug(f"Attempting to connect to server at {self._server_host}:{self._server_port} via TCP for registration")
             sock.connect((self._server_host, self._server_port))
+            logger.debug(f"Sending registration message to server at {self._server_host}:{self._server_port}")
             sock.sendall(self._new_connection_initial_tcp())
 
-            response = json.loads(sock.recv(1024).decode().strip())
+            response = sock.recv(4096)
+            response_json = json.loads(response.decode("utf-8").strip())
 
-            uuid = response.get("uuid")
+            uuid = response_json.get("uuid")
 
-            if response.get("status") != "ok":
-                logger.error(f"Failed to connect to server: {response.get('error', 'Unknown error')}")
-                raise ConnectionError(f"Failed to connect to server: {response.get('error', 'Unknown error')}")
+            if response_json.get("status") != "ok":
+                logger.error(f"Failed to connect to server: {response_json.get('error', 'Unknown error')}")
+                raise ConnectionError(f"Failed to connect to server: {response_json.get('error', 'Unknown error')}")
 
             if uuid is not None:
                 self._client_uuid = uuid
@@ -55,7 +59,8 @@ class SnaikenetClient:
                 raise ConnectionError("Failed to connect to server: No UUID received")
 
         # UDP hole punching:
-        self._udp_transport.sendto(self._client_uuid.encode(), (self._server_host, self._server_port))
+        logger.debug(f"Sending UDP hole-punching datagram to server at {self._server_host}:{self._server_port} with UUID {self._client_uuid}")
+        self._udp_transport.sendto(self._client_uuid.encode())
 
     async def _send_direction_loop(self):
         try:
@@ -80,7 +85,7 @@ class SnaikenetClient:
 
     @staticmethod
     def _to_json(data: dict) -> bytes:
-        return json.dumps(data).encode('utf-8')
+        return json.dumps(data).encode() + b"\n"
 
     def _new_connection_initial_tcp(self):
         return self._to_json({
@@ -92,7 +97,9 @@ class SnaikenetClient:
             self._client = client
 
         def connection_made(self, transport: asyncio.DatagramTransport):
+            logger.info("UDP connection established with server binding to local port {}".format(transport.get_extra_info('sockname')[1]))
             self._client._udp_transport = transport
 
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
-            self._client._on_received_datagram(data)
+            logger.debug(f"Received UDP message from {addr}: {data.decode().strip()}")
+            self._client._on_receive_game_state_frame(protocol.decode_player_game_state(data))
