@@ -10,7 +10,7 @@ def handle_new_frame(frame: ClientGameStateFrame):
 
 
 async def main():
-    client = SnaikenetClient(server_host="localhost", server_port=8888, on_receive_game_state_frame=handle_new_frame)
+    client = SnaikenetClient(server_host="localhost", server_tcp_port=8888, on_receive_game_state_frame=handle_new_frame)
     await client.start()
     client.set_direction(ClientDirection.NORTH)
 

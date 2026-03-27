@@ -35,7 +35,7 @@ def encode_direction(direction: ClientDirection) -> bytes:
     })
 
 def _to_json(data: dict) -> bytes:
-    return json.dumps(data).encode("utf-8")
+    return json.dumps(data).encode("utf-8") + b"\n"
 
 def encode_game_state(game_state: dict[str, PlayerView], sequence_number: int) -> dict[str, bytes]:
     encoded_game_state = {}

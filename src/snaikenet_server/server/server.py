@@ -5,7 +5,10 @@ from collections.abc import Callable
 
 from loguru import logger
 
+from snaikenet_server.game.types import Direction
 from snaikenet_server.server.connected_clients import ConnectedClients
+
+from snaikenet_protocol import protocol
 
 
 class SnaikenetServer:
@@ -25,36 +28,42 @@ class SnaikenetServer:
     """
 
     _host: str
-    _port: int
+    _tcp_port: int
+    _udp_port: int
     _connected_clients: ConnectedClients
     # Temporary storage for pending hole-punching requests: UUID -> Future that will be set with (host, port) when UDP datagram is received
-    _pending: dict[str, asyncio.Future[tuple[str, int]]]
-    _udp_transport: asyncio.DatagramTransport | None = None
-    _on_received_datagram: Callable[[str, bytes]]
+    _pending_clients: dict[str, asyncio.Future[tuple[str, int]]]
+    _on_received_direction: Callable[[str, Direction]]
     _on_new_client: Callable[[str]]
-    _tcp_server: asyncio.AbstractServer | None = None
     _keep_accepting_new_clients: bool
+    _udp_transport: asyncio.DatagramTransport | None = None
+    _tcp_server: asyncio.Server | None = None
 
     def __init__(
         self,
-        on_received_datagram: Callable[[str, bytes]] = lambda _, __: None,
+        on_received_direction: Callable[[str, Direction]] = lambda _, __: None,
         on_new_client: Callable[[str]] = lambda _: None,
         host="localhost",
-        port=8888
+        tcp_port=8888,
+        udp_port=8888
     ):
-        self._on_received_datagram = on_received_datagram
+        self._on_received_direction = on_received_direction
         self._on_new_client = on_new_client
         self._host = host
-        self._port = port
+        self._tcp_port = tcp_port
+        self._udp_port = udp_port
         self._connected_clients = ConnectedClients()
         self._keep_accepting_new_clients = True
-        self._pending = {}
+        self._pending_clients = {}
 
     def get_host(self) -> str:
         return self._host
 
-    def get_port(self) -> int:
-        return self._port
+    def get_tcp_port(self) -> int:
+        return self._tcp_port
+
+    def get_udp_port(self) -> int:
+        return self._udp_port
 
     def set_keep_accepting_new_clients(self, keep_accepting_new_clients: bool):
         self._keep_accepting_new_clients = keep_accepting_new_clients
@@ -62,7 +71,7 @@ class SnaikenetServer:
     # Broadcast message to connected clients using their registered NAT-mapped addresses
     def broadcast(self, client_data: dict[str, bytes]):
         for uuid, data in client_data.items():
-            dest = self._connected_clients.get_client_addr(uuid)
+            dest = self._connected_clients.get_client_by_id(uuid)
             if dest is not None:
                 self._udp_transport = self._udp_transport or None
 
@@ -75,18 +84,24 @@ class SnaikenetServer:
     async def start(self):
         loop = asyncio.get_running_loop()
 
-        await loop.create_datagram_endpoint(
-            lambda: self._UdpProtocol(self), local_addr=(self._host, self._port)
-        )
-        logger.info(f"UDP server started on {self._host}:{self._port}")
-
         self._tcp_server = await asyncio.start_server(
-            self._handle_registration, self._host, self._port
+            self._handle_registration, self._host, self._tcp_port
         )
-        logger.info(f"TCP server started on {self._host}:{self._port}")
+        self._tcp_port = self._tcp_server.sockets[0].getsockname()[1]
+        logger.info(f"TCP server started on {self._host}:{self._tcp_port}")
+
+        await loop.create_datagram_endpoint(
+            lambda: self._UdpProtocol(self), local_addr=(self._host, self._udp_port)
+        )
+        self._udp_port = self._udp_transport.get_extra_info("socket").getsockname()[1]
+        logger.info(f"UDP server started on {self._host}:{self._udp_port}")
+
 
     def get_clients_str(self) -> str:
-        return "Clients connected: " + ", ".join(f"{client.client_id} at {addr}" for client, addr in self._connected_clients.items())
+        return "Clients connected: " + ", ".join(f"{client.get_id()} at {client.get_addr()}" for client in self._connected_clients.get_clients())
+
+    def get_client_ids(self) -> list[str]:
+        return [client.get_id() for client in self._connected_clients.get_clients()]
 
     async def server_forever(self):
         if self._tcp_server is None:
@@ -127,7 +142,7 @@ class SnaikenetServer:
                         await writer.drain()
                         return
                     client_id = str(uuid4())
-                    self._connected_clients.remove_client_by_id(client_id)  # Clear any old registration with same UUID just in case, should be very unlikely
+                    self._connected_clients.pop_client_by_id(client_id)  # Clear any old registration with same UUID just in case, should be very unlikely
                     logger.debug(
                         f"New client registering with UUID {client_id} from TCP {peer}"
                     )
@@ -138,10 +153,7 @@ class SnaikenetServer:
                         await writer.drain()
                         return
 
-                    old_addr = self._connected_clients.get_client_addr(client_id)
-                    if old_addr:
-                        self._connected_clients.remove_client_by_addr(old_addr)
-                        self._connected_clients.remove_client_by_id(client_id)  # Clear old registration so that the new one can be registered after hole punching completes
+                    self._connected_clients.pop_client_by_id(client_id)
                     logger.info(
                         f"Client with UUID {client_id} is reconnecting from {peer}"
                     )
@@ -152,7 +164,7 @@ class SnaikenetServer:
 
             loop = asyncio.get_running_loop()
             fut = loop.create_future()
-            self._pending[client_id] = fut
+            self._pending_clients[client_id] = fut
 
             writer.write(self._udp_hole_punch_request(client_id))
             logger.debug(f"Sending hole punch request to client {client_id} at TCP {peer}")
@@ -163,10 +175,10 @@ class SnaikenetServer:
                     fut, timeout=10.0
                 )
             except asyncio.TimeoutError:
-                await self._pending.pop(client_id, None)
+                await self._pending_clients.pop(client_id, None)
 
                 if req_type == "new":
-                    self._connected_clients.remove_client_by_id(client_id)  # Clear any registration for this client since hole punch failed
+                    self._connected_clients.pop_client_by_id(client_id)  # Clear any registration for this client since hole punch failed
                 logger.warning(f"Hole punch timed out for client {client_id}")
                 writer.write(self._error_response("Hole punch timed out"))
                 await writer.drain()
@@ -176,13 +188,14 @@ class SnaikenetServer:
             self._connected_clients.register_client(client_id, external_addr)
             if req_type == "new":
                 self._on_new_client(client_id)
+
             logger.info(
-                f"Client {client_id} hole-punched successfully with external address {external_addr}"
+                f"Client {client_id} hole-punched successfully with external address {external_addr}. Sending registration success response to TCP {peer}"
             )
             writer.write(
-                self._udp_hole_punch_success_response(client_id, external_addr)
+                self._udp_hole_punch_success_response()
             )
-            await writer.drain()
+            await asyncio.wait_for(writer.drain(), timeout=5.0)
 
         except (json.JSONDecodeError, KeyError) as e:
             logger.debug(f"Invalid registration request from {peer}: {e}")
@@ -201,14 +214,14 @@ class SnaikenetServer:
 
     def _udp_hole_punch_request(self, client_id: str) -> bytes:
         return self._to_json(
-            {"status": "ok", "uuid": client_id, "port": self._port}
+            {"status": "ok", "uuid": client_id, "udp_port": self._udp_port}
         )
 
     def _udp_hole_punch_success_response(
-        self, client_id: str, external_addr: tuple[str, int]
+        self
     ) -> bytes:
         return self._to_json(
-            {"status": "ok", "uuid": client_id, "udp_endpoint": list(external_addr)}
+            {"status": "registered"}
         )
 
     class _UdpProtocol(asyncio.DatagramProtocol):
@@ -220,19 +233,28 @@ class SnaikenetServer:
 
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
             msg = data.decode().strip()
+            msg_json = json.loads(msg)
+            logger.debug(f"Received UDP datagram from {addr}: {msg}")
 
-            # Hole-punch ping
-            if msg in self._server._pending:
-                logger.info(f"Received hole punch ping from {addr} for client {msg}")
-                fut = self._server._pending.pop(msg)
-                if not fut.done():
-                    fut.set_result(addr)
-                return
+            msg_type = msg_json.get("type")
 
-            # Regular traffic
-            if self._server._connected_clients.has_client_addr(addr):
-                uuid = self._server._connected_clients.get_client_id(addr)
-                self._server._on_received_datagram(uuid, data)
-                logger.debug(f"Received UDP message from {uuid} at {addr}: {msg}")
-            else:
-                logger.debug(f"Received UDP message from unknown address {addr}: {msg}")
+            if msg_type == "hole_punch":
+                client_id = msg_json.get("uuid")
+                # Hole-punch ping
+                if client_id in self._server._pending_clients:
+                    logger.info(f"Received hole punch ping from {addr} for client {client_id}")
+                    fut = self._server._pending_clients.pop(client_id)
+                    if not fut.done():
+                        fut.set_result(addr)
+                    return
+                elif self._server._connected_clients.has_client_id(client_id):
+                    logger.debug(f"Received hole punch for existing client {client_id} from {addr}. Ignoring since client is already registered.")
+                    return
+            elif msg_type == "direction":
+                if self._server._connected_clients.has_client_addr(addr):
+                    client = self._server._connected_clients.get_client_by_addr(addr)
+                    self._server._connected_clients.touch_client_by_id(client.get_id())
+                    self._server._on_received_direction(client.get_id(), protocol.decode_direction(data))
+                    logger.debug(f"Received UDP message from {client} at {addr}: {msg}")
+                else:
+                    logger.debug(f"Received UDP message from unknown address {addr}: {msg}")
