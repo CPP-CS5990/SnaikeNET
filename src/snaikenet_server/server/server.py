@@ -45,7 +45,7 @@ class SnaikenetServer:
         on_new_client: Callable[[str]] = lambda _: None,
         host="localhost",
         tcp_port=8888,
-        udp_port=8888
+        udp_port=8888,
     ):
         self._on_received_direction = on_received_direction
         self._on_new_client = on_new_client
@@ -96,9 +96,11 @@ class SnaikenetServer:
         self._udp_port = self._udp_transport.get_extra_info("socket").getsockname()[1]
         logger.info(f"UDP server started on {self._host}:{self._udp_port}")
 
-
     def get_clients_str(self) -> str:
-        return "Clients connected: " + ", ".join(f"{client.get_id()} at {client.get_addr()}" for client in self._connected_clients.get_clients())
+        return "Clients connected: " + ", ".join(
+            f"{client.get_id()} at {client.get_addr()}"
+            for client in self._connected_clients.get_clients()
+        )
 
     def get_client_ids(self) -> list[str]:
         return [client.get_id() for client in self._connected_clients.get_clients()]
@@ -130,7 +132,9 @@ class SnaikenetServer:
             if not raw:
                 return
 
-            logger.debug(f"Received registration request from {peer}: {raw.decode().strip()}")
+            logger.debug(
+                f"Received registration request from {peer}: {raw.decode().strip()}"
+            )
 
             msg = json.loads(raw.decode().strip())
             req_type = msg.get("type")
@@ -142,7 +146,9 @@ class SnaikenetServer:
                         await writer.drain()
                         return
                     client_id = str(uuid4())
-                    self._connected_clients.pop_client_by_id(client_id)  # Clear any old registration with same UUID just in case, should be very unlikely
+                    self._connected_clients.pop_client_by_id(
+                        client_id
+                    )  # Clear any old registration with same UUID just in case, should be very unlikely
                     logger.debug(
                         f"New client registering with UUID {client_id} from TCP {peer}"
                     )
@@ -167,7 +173,9 @@ class SnaikenetServer:
             self._pending_clients[client_id] = fut
 
             writer.write(self._udp_hole_punch_request(client_id))
-            logger.debug(f"Sending hole punch request to client {client_id} at TCP {peer}")
+            logger.debug(
+                f"Sending hole punch request to client {client_id} at TCP {peer}"
+            )
             await writer.drain()
 
             try:
@@ -178,7 +186,9 @@ class SnaikenetServer:
                 await self._pending_clients.pop(client_id, None)
 
                 if req_type == "new":
-                    self._connected_clients.pop_client_by_id(client_id)  # Clear any registration for this client since hole punch failed
+                    self._connected_clients.pop_client_by_id(
+                        client_id
+                    )  # Clear any registration for this client since hole punch failed
                 logger.warning(f"Hole punch timed out for client {client_id}")
                 writer.write(self._error_response("Hole punch timed out"))
                 await writer.drain()
@@ -192,9 +202,7 @@ class SnaikenetServer:
             logger.info(
                 f"Client {client_id} hole-punched successfully with external address {external_addr}. Sending registration success response to TCP {peer}"
             )
-            writer.write(
-                self._udp_hole_punch_success_response()
-            )
+            writer.write(self._udp_hole_punch_success_response())
             await asyncio.wait_for(writer.drain(), timeout=5.0)
 
         except (json.JSONDecodeError, KeyError) as e:
@@ -217,12 +225,8 @@ class SnaikenetServer:
             {"status": "ok", "uuid": client_id, "udp_port": self._udp_port}
         )
 
-    def _udp_hole_punch_success_response(
-        self
-    ) -> bytes:
-        return self._to_json(
-            {"status": "registered"}
-        )
+    def _udp_hole_punch_success_response(self) -> bytes:
+        return self._to_json({"status": "registered"})
 
     class _UdpProtocol(asyncio.DatagramProtocol):
         def __init__(self, server: "SnaikenetServer"):
@@ -242,19 +246,27 @@ class SnaikenetServer:
                 client_id = msg_json.get("uuid")
                 # Hole-punch ping
                 if client_id in self._server._pending_clients:
-                    logger.info(f"Received hole punch ping from {addr} for client {client_id}")
+                    logger.info(
+                        f"Received hole punch ping from {addr} for client {client_id}"
+                    )
                     fut = self._server._pending_clients.pop(client_id)
                     if not fut.done():
                         fut.set_result(addr)
                     return
                 elif self._server._connected_clients.has_client_id(client_id):
-                    logger.debug(f"Received hole punch for existing client {client_id} from {addr}. Ignoring since client is already registered.")
+                    logger.debug(
+                        f"Received hole punch for existing client {client_id} from {addr}. Ignoring since client is already registered."
+                    )
                     return
             elif msg_type == "direction":
                 if self._server._connected_clients.has_client_addr(addr):
                     client = self._server._connected_clients.get_client_by_addr(addr)
                     self._server._connected_clients.touch_client_by_id(client.get_id())
-                    self._server._on_received_direction(client.get_id(), protocol.decode_direction(data))
+                    self._server._on_received_direction(
+                        client.get_id(), protocol.decode_direction(data)
+                    )
                     logger.debug(f"Received UDP message from {client} at {addr}: {msg}")
                 else:
-                    logger.debug(f"Received UDP message from unknown address {addr}: {msg}")
+                    logger.debug(
+                        f"Received UDP message from unknown address {addr}: {msg}"
+                    )

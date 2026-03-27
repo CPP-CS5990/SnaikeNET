@@ -162,5 +162,6 @@ def test_invalid_direction_decode():
     assert decode_direction(no_direction) is None
     assert decode_direction(invalid_direction) is None
 
+
 def _to_json(dict_obj):
     return json.dumps(dict_obj).encode("utf-8")

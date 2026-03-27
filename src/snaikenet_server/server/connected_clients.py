@@ -3,6 +3,7 @@ import time
 type ClientToAddr = dict[str, int]
 type AddrToClient = dict[tuple[str, int], int]
 
+
 class _ConnectedClient:
     _client_id: str
     _addr: tuple[str, int]
@@ -21,6 +22,7 @@ class _ConnectedClient:
 
     def touch(self):
         self.last_seen = time.time()
+
 
 class ConnectedClients:
     _client_id_map: ClientToAddr

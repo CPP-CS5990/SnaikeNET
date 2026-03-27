@@ -6,6 +6,7 @@ from snaikenet_server.game.types import Direction
 from snaikenet_server.server.server import SnaikenetServer
 import asyncio
 
+
 # Test for server-client registration over TCP and UDP hole punching
 @pytest.mark.asyncio
 async def test_client_tcp_registration():
@@ -16,7 +17,9 @@ async def test_client_tcp_registration():
     print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
 
     # Create and start client
-    client = SnaikenetClient(server_host=server.get_host(), server_tcp_port=server.get_tcp_port())
+    client = SnaikenetClient(
+        server_host=server.get_host(), server_tcp_port=server.get_tcp_port()
+    )
     # Client will attempt to connect to server and register over TCP, then receive UDP port for hole punching. We just need to start the client and wait for it to complete the registration process.
     await client.start()
     print(f"Client ID: {client.get_client_id()}")
@@ -35,6 +38,7 @@ async def test_client_send_and_receive_direction():
     loop = asyncio.get_running_loop()
     received_direction_future = loop.create_future()
     received_client_id_future = loop.create_future()
+
     def on_received_direction(client_id: str, direction: Direction):
         if received_client_id_future.done() or received_direction_future.done():
             return
@@ -42,13 +46,17 @@ async def test_client_send_and_receive_direction():
         received_client_id_future.set_result(client_id)
 
     # Create and start server
-    server = SnaikenetServer(on_received_direction=on_received_direction, tcp_port=0, udp_port=0)
+    server = SnaikenetServer(
+        on_received_direction=on_received_direction, tcp_port=0, udp_port=0
+    )
     await server.start()
     asyncio.create_task(server.server_forever())
     print(f"Server started at {server.get_host()}:{server.get_udp_port()}")
 
     # Create and start client
-    client = SnaikenetClient(server_host=server.get_host(), server_tcp_port=server.get_tcp_port())
+    client = SnaikenetClient(
+        server_host=server.get_host(), server_tcp_port=server.get_tcp_port()
+    )
     # Client will attempt to connect to server and register over TCP, then receive UDP port for hole punching. We just need to start the client and wait for it to complete the registration process.
     await client.start()
 
