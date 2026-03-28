@@ -1,10 +1,9 @@
 import asyncio
 import json
-import socket
-from collections.abc import Callable
+
 from loguru import logger
 
-from snaikenet_client.client_data import ClientGameStateFrame
+from snaikenet_client.client.client_event_handler import SnaikenetClientEventHandler, DefaultSnaikenetClientEventHandler
 from snaikenet_client.types import ClientDirection
 from snaikenet_protocol import protocol
 
@@ -15,22 +14,22 @@ class SnaikenetClient:
     _server_host: str
     _server_tcp_port: int
     _server_udp_port: int | None = None
-    _on_receive_game_state_frame: Callable[[ClientGameStateFrame]]
     _client_uuid: str | None = None
     _direction: ClientDirection | None = None
     _send_task: asyncio.Task | None = None
+    _event_handler: SnaikenetClientEventHandler
 
     def __init__(
         self,
-        on_receive_game_state_frame: Callable[[ClientGameStateFrame]] = lambda _: None,
         server_tcp_port: int = 8888,
         server_host: str = "localhost",
         send_interval_ms: int = 50,
+        event_handler: SnaikenetClientEventHandler | None = DefaultSnaikenetClientEventHandler(),
     ):
         self._send_interval = send_interval_ms / 1000.0
         self._server_host = server_host
         self._server_tcp_port = server_tcp_port
-        self._on_receive_game_state_frame = on_receive_game_state_frame
+        self._event_handler = event_handler
 
     async def start(self):
         loop = asyncio.get_running_loop()
@@ -165,8 +164,7 @@ class SnaikenetClient:
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
             logger.debug(f"Received UDP message from {addr}: {data.decode().strip()}")
             try:
-                game_state_frame = protocol.decode_player_game_state(data)
-                self._client._on_receive_game_state_frame(game_state_frame)
+                self._client._event_handler.on_receive_game_state_frame(protocol.decode_player_game_state(data))
             except ValueError as _:
                 logger.error(
                     f"Failed to decode game state frame from server: {data.decode().strip()}"

@@ -76,7 +76,7 @@ class ConnectedClients:
         return list(self._clients)
 
     def has_client_id(self, client_id: str) -> bool:
-        return _ConnectedClient(client_id) in self._client_id_map
+        return client_id in self._client_id_map
 
     def has_client_addr(self, addr: tuple[str, int]) -> bool:
         return addr in self._addr_map

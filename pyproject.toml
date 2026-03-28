@@ -17,7 +17,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-server = "snaikenet_server.__main__:main"
+server = "snaikenet_server.__main__:run_main"
 visualize_gamestate = "snaikenet_server.game.visualize_gamestate:main"
 prototype = "snaikenet_server.game.prototype_game:main"
 

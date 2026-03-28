@@ -5,7 +5,7 @@
 #   - operate on game state object
 # Create a command interface for server administration and debugging (allows us to start/stop the game, add/remove players, etc.)
 # - (Later) Create an HTTP server to expose the command interface via a REST API (for remote administration and integration with other services)
-
+import asyncio
 # Events:
 # When new player makes a connection, they are assigned an ID and are added to the game state
 # When the connection is closed, the player is removed
@@ -42,14 +42,15 @@
 # On the UDP Server, we will listen for messages from players:
 #
 import sys
-from snaikenet_server.game.game import Game, create_game_thread_instance
+from snaikenet_server.game.game import Game, game_loop
 from snaikenet_server.parse_args import parse_args
 from loguru import logger
 
 from snaikenet_server.server_commands import (
     GameServerCommandInterface,
-    create_console_thread_instance,
+    console_loop,
 )
+import asyncio
 
 TICK_RATE = 24
 TICK_INTERVAL = 1 / TICK_RATE
@@ -60,11 +61,11 @@ def setup_logger(verbose: bool):
     level = "DEBUG" if verbose else "INFO"
     logger.add(sys.stderr, level=level)
     logger.add(
-        "logs/game.log", rotation="1 MB", level=level
+        "logs/server.log", rotation="1 MB", level=level
     )  # Log to file as well, with rotation
 
 
-def main():
+async def main():
     args = parse_args()
     setup_logger(args.verbose)
 
@@ -81,17 +82,16 @@ def main():
     )
 
     # Create thread instances
-    game_thread_instance = create_game_thread_instance(game, TICK_INTERVAL)
-    console_thread_instance = create_console_thread_instance(command_interface)
+    await asyncio.gather(
+        asyncio.create_task(game_loop(game, TICK_INTERVAL, host=args.host, tcp_port=args.tcp_port, udp_port=args.udp_port)),
+        asyncio.to_thread(console_loop, command_interface),
+    )
 
-    # Create FastAPI server instance with command interface
-    # if False:  # TODO: Implement when HTTP server is ready
-    #     fastapi_command_interface = FastAPIServerCommands(command_interface)
-
-    # Start threads
-    game_thread_instance.start()
-    console_thread_instance.start()
-
+def run_main():
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Server shutting down due to keyboard interrupt")
 
 if __name__ == "__main__":
-    main()
+    run_main()

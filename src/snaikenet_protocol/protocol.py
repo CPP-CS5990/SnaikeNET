@@ -41,19 +41,6 @@ def _to_json(data: dict) -> bytes:
     return json.dumps(data).encode("utf-8") + b"\n"
 
 
-def encode_game_state(
-    game_state: dict[str, PlayerView], sequence_number: int
-) -> dict[str, bytes]:
-    encoded_game_state = {}
-
-    for player_id, player_view in game_state.items():
-        encoded_game_state[player_id] = encode_player_game_state(
-            player_id, player_view, sequence_number
-        )
-
-    return encoded_game_state
-
-
 """
 Bytes 0-3: sequence number (4 bytes total, big-endian)
 Bytes 4-5: Viewport width and height (2 bytes total)

@@ -1,14 +1,13 @@
 import asyncio
 import json
 from uuid import uuid4
-from collections.abc import Callable
 
 from loguru import logger
 
-from snaikenet_server.game.types import Direction
-from snaikenet_server.server.connected_clients import ConnectedClients
-
 from snaikenet_protocol import protocol
+from snaikenet_server.game.game_state import PlayerView
+from snaikenet_server.server.connected_clients import ConnectedClients
+from snaikenet_server.server.server_event_handler import SnaikenetServerEventHandler, DefaultSnaikenetServerEventHandler
 
 
 class SnaikenetServer:
@@ -33,28 +32,25 @@ class SnaikenetServer:
     _connected_clients: ConnectedClients
     # Temporary storage for pending hole-punching requests: UUID -> Future that will be set with (host, port) when UDP datagram is received
     _pending_clients: dict[str, asyncio.Future[tuple[str, int]]]
-    _on_received_direction: Callable[[str, Direction]]
-    _on_new_client: Callable[[str]]
     _keep_accepting_new_clients: bool
     _udp_transport: asyncio.DatagramTransport | None = None
     _tcp_server: asyncio.Server | None = None
+    _event_handler: SnaikenetServerEventHandler
 
     def __init__(
         self,
-        on_received_direction: Callable[[str, Direction]] = lambda _, __: None,
-        on_new_client: Callable[[str]] = lambda _: None,
         host="localhost",
         tcp_port=8888,
         udp_port=8888,
+        event_handler: SnaikenetServerEventHandler = DefaultSnaikenetServerEventHandler(),
     ):
-        self._on_received_direction = on_received_direction
-        self._on_new_client = on_new_client
         self._host = host
         self._tcp_port = tcp_port
         self._udp_port = udp_port
         self._connected_clients = ConnectedClients()
         self._keep_accepting_new_clients = True
         self._pending_clients = {}
+        self._event_handler = event_handler
 
     def get_host(self) -> str:
         return self._host
@@ -68,18 +64,22 @@ class SnaikenetServer:
     def set_keep_accepting_new_clients(self, keep_accepting_new_clients: bool):
         self._keep_accepting_new_clients = keep_accepting_new_clients
 
-    # Broadcast message to connected clients using their registered NAT-mapped addresses
-    def broadcast(self, client_data: dict[str, bytes]):
-        for uuid, data in client_data.items():
-            dest = self._connected_clients.get_client_by_id(uuid)
-            if dest is not None:
-                self._udp_transport = self._udp_transport or None
+    def broadcast_game_state_frames(
+        self, client_frames: dict[str, PlayerView], sequence_number: int
+    ):
+        for uuid, frame in client_frames.items():
+            self.broadcast_game_state_frame(uuid, frame, sequence_number)
 
-    def broadcast_all(self, data: bytes):
-        for dest in self._connected_clients.get_client_addrs():
-            if dest is not None:
-                self._udp_transport = self._udp_transport or None
-                self._udp_transport.sendto(data, dest)
+    def broadcast_game_state_frame(
+        self, client_id: str, client_frame: PlayerView, sequence_number: int
+    ):
+        dest = self._connected_clients.get_client_by_id(client_id)
+        if dest is not None:
+            self._udp_transport = self._udp_transport or None
+            self._udp_transport.sendto(
+                protocol.encode_player_game_state(client_id, client_frame, sequence_number),
+                dest.get_addr(),
+            )
 
     async def start(self):
         loop = asyncio.get_running_loop()
@@ -154,8 +154,8 @@ class SnaikenetServer:
                     )
                 case "reconnect":
                     client_id = msg.get("uuid")
-                    if self._connected_clients.has_client_id(client_id):
-                        writer.write(self._error_response("Unknown UUID"))
+                    if not self._connected_clients.has_client_id(client_id):
+                        writer.write(self._error_response("Unknown UUID: Cannot reconnect"))
                         await writer.drain()
                         return
 
@@ -197,7 +197,7 @@ class SnaikenetServer:
             # At this point, we have already handled if this is a reconnect and cleared the old address, so we can just register the new address
             self._connected_clients.register_client(client_id, external_addr)
             if req_type == "new":
-                self._on_new_client(client_id)
+                self._event_handler.on_new_client_connect(client_id)
 
             logger.info(
                 f"Client {client_id} hole-punched successfully with external address {external_addr}. Sending registration success response to TCP {peer}"
@@ -238,7 +238,6 @@ class SnaikenetServer:
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
             msg = data.decode().strip()
             msg_json = json.loads(msg)
-            logger.debug(f"Received UDP datagram from {addr}: {msg}")
 
             msg_type = msg_json.get("type")
 
@@ -262,10 +261,9 @@ class SnaikenetServer:
                 if self._server._connected_clients.has_client_addr(addr):
                     client = self._server._connected_clients.get_client_by_addr(addr)
                     self._server._connected_clients.touch_client_by_id(client.get_id())
-                    self._server._on_received_direction(
+                    self._server._event_handler.on_receive_direction(
                         client.get_id(), protocol.decode_direction(data)
                     )
-                    logger.debug(f"Received UDP message from {client} at {addr}: {msg}")
                 else:
                     logger.debug(
                         f"Received UDP message from unknown address {addr}: {msg}"

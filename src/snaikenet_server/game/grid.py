@@ -107,26 +107,7 @@ class Grid:
                     wall_tile = TileData(tile_type=TileType.WALL)
                     row.append(wall_tile)
             viewport.append(row)
-        logger.debug(
-            f"Generated viewport for center position {center_position} with distance {distance_from_center}:\n{self.as_string(viewport)}\n"
-        )
         return viewport
-
-    def as_string(self, grid: GridStructure) -> str:
-        tile_symbols = {
-            TileType.EMPTY: ".",
-            TileType.WALL: "#",
-            TileType.FOOD: "*",
-            TileType.SNAKE: "S",
-        }
-        rows = []
-        for row in grid:
-            row_str = ""
-            for tile in row:
-                row_str += tile_symbols[tile.tile_type]
-            rows.append(row_str)
-        return "\n".join(rows)
-
 
 class TileType(Enum):
     EMPTY = 0

@@ -1,5 +1,7 @@
+import asyncio
 import collections
 from loguru import logger
+from typing_extensions import override
 
 from snaikenet_server.game.game_state import GameState, PlayerView
 from snaikenet_protocol import protocol
@@ -9,9 +11,11 @@ import time
 from snaikenet_server.game.grid import GridStructure
 from snaikenet_server.game.types import PlayerID, GridSize, Direction
 from snaikenet_server.server.server import SnaikenetServer
+from snaikenet_server.server.server_event_handler import SnaikenetServerEventHandler
 
 
 class Game:
+    game_lock: threading.Lock = threading.Lock()
     _game_state: GameState
     _start_event: threading.Event
     _stop_signal: bool = False
@@ -25,9 +29,10 @@ class Game:
         self._game_state = GameState(grid_size, viewport_distance_from_center)
 
     def tick(self):
-        self._game_state.handle_player_moves()
-        self._game_state.handle_collisions()
-        self._game_state.handle_food_spawning()
+        with self.game_lock:
+            self._game_state.handle_player_moves()
+            self._game_state.handle_collisions()
+            self._game_state.handle_food_spawning()
 
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         player_id = self._game_state.add_new_player(player_id)
@@ -54,9 +59,10 @@ class Game:
     def is_running(self) -> bool:
         return not self._stop_signal
 
-    def wait_for_game_start(self):
+    async def wait_for_game_start(self):
         logger.debug("Waiting for start event...\n")
-        self._start_event.wait()
+        while not self._start_event.is_set():
+            await asyncio.sleep(0.1)  # Sleep briefly to avoid busy waiting
 
     def restart_game(self):
         self._game_state.restart_game()
@@ -92,70 +98,71 @@ class Game:
             for tile in row:
                 yield tile
 
+    def delete_player(self, player_id: PlayerID):
+        self._game_state.delete_player(player_id)
+        logger.info(f"Deleted player with ID: {player_id}\n")
 
-def create_game_thread_instance(game: Game, tick_interval: float) -> threading.Thread:
-    def game_loop():
-        game_lock = threading.Lock()
 
-        def on_received_datagram(client_id: str, data: bytes):
+async def game_loop(game: Game, tick_interval: float, host: str, tcp_port: int, udp_port: int):
+
+    class _GameEventHandler(SnaikenetServerEventHandler):
+        @override
+        def on_receive_direction(self, client_id: str, direction: Direction):
             # Handle incoming datagram from clients (e.g., player input)
-            logger.debug(f"Received datagram from client {client_id}: {data}\n")
-            direction = protocol.decode_direction(data)
-            if direction is not None:
-                with game_lock:
-                    game.set_player_direction(
-                        client_id, direction
-                    )  # Placeholder, replace with actual direction decoding
-            else:
-                logger.debug(
-                    f"Received invalid datagram from client {client_id}: {data}\n"
-                )
+            with game.game_lock:
+                game.set_player_direction(
+                    client_id, direction
+                )  # Placeholder, replace with actual direction decoding
 
-        def on_player_connected(client_id: str):
+        @override
+        def on_client_disconnect(self, client_id: str):
+            with game.game_lock:
+                game.delete_player(client_id)
+
+        @override
+        def on_new_client_connect(self, client_id: str):
             logger.info(f"Player connected with client ID: {client_id}\n")
-            with game_lock:
+            with game.game_lock:
                 game.add_new_player(client_id)
 
-        server = SnaikenetServer(on_received_datagram, on_player_connected)
-        logger.info("Game thread started, waiting for start signal...\n")
-        game.wait_for_game_start()
-        # Once the game starts, stop accepting new clients
-        server.set_keep_accepting_new_clients(False)
+    server = SnaikenetServer(host=host, tcp_port=tcp_port, udp_port=udp_port, event_handler=_GameEventHandler())
+    await server.start()
+    logger.info("Game thread started, waiting for start signal...\n")
+    await game.wait_for_game_start()
+    # Once the game starts, stop accepting new clients
+    server.set_keep_accepting_new_clients(False)
 
-        logger.info("Start signal received, entering game loop...\n")
-        tick = 0
-        next_tick_time = time.perf_counter()
-        tick_times = collections.deque(
-            maxlen=100
-        )  # Keep track of the last 100 tick times for performance monitoring
+    logger.info("Start signal received, entering game loop...\n")
+    tick = 0
+    next_tick_time = time.perf_counter()
+    tick_times = collections.deque(
+        maxlen=100
+    )
 
-        while game.is_running():
-            tick_start = time.perf_counter()
-            with game_lock:
-                game.tick()
+    while game.is_running():
+        tick_start = time.perf_counter()
 
-            player_states = game.get_player_states()
-            player_states_encoded = protocol.encode_game_state(player_states)
-            server.broadcast(player_states_encoded)
-            tick += 1
-            tick_times.append(time.perf_counter() - tick_start)
+        game.tick()
 
-            next_tick_time += tick_interval
-            sleep_duration = next_tick_time - time.perf_counter()
+        player_states = game.get_player_states()
+        server.broadcast_game_state_frames(player_states, tick)
+        tick += 1
+        tick_times.append(time.perf_counter() - tick_start)
 
-            if sleep_duration > 0:
-                threading.Event().wait(sleep_duration)
-            else:
-                logger.warning(f"Tick {tick} overran by {-sleep_duration:.4f}s\n")
+        next_tick_time += tick_interval
+        sleep_duration = next_tick_time - time.perf_counter()
 
-            if tick % 100 == 0:
-                avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
-                real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
-                logger.debug(
-                    f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
-                )
+        if sleep_duration > 0:
+            threading.Event().wait(sleep_duration)
+        else:
+            logger.warning(f"Tick {tick} overran by {-sleep_duration:.4f}s\n")
 
-        game.cleanup()
-        logger.info("Game thread exiting...\n")
+        if tick % 100 == 0:
+            avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
+            real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
+            logger.debug(
+                f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
+            )
 
-    return threading.Thread(target=game_loop)
+    game.cleanup()
+    logger.info("Game thread exiting...\n")
