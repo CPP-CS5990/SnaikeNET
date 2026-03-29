@@ -153,7 +153,7 @@ async def game_loop(game: Game, tick_interval: float, host: str, tcp_port: int, 
         sleep_duration = next_tick_time - time.perf_counter()
 
         if sleep_duration > 0:
-            threading.Event().wait(sleep_duration)
+            await asyncio.sleep(sleep_duration)
         else:
             logger.warning(f"Tick {tick} overran by {-sleep_duration:.4f}s\n")
 
