@@ -75,7 +75,6 @@ class SnaikenetServer:
     ):
         dest = self._connected_clients.get_client_by_id(client_id)
         if dest is not None:
-            self._udp_transport = self._udp_transport or None
             self._udp_transport.sendto(
                 protocol.encode_player_game_state(client_id, client_frame, sequence_number),
                 dest.get_addr(),

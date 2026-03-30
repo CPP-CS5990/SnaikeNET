@@ -52,7 +52,7 @@ from snaikenet_server.server_commands import (
 )
 import asyncio
 
-TICK_RATE = 24
+TICK_RATE = 16
 TICK_INTERVAL = 1 / TICK_RATE
 
 
@@ -69,7 +69,7 @@ async def main():
     args = parse_args()
     setup_logger(args.verbose)
 
-    game = Game((128, 128))
+    game = Game((128, 128), viewport_distance_from_center=(17, 17))
 
     def stop_server():
         game.stop_game()

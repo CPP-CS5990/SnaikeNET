@@ -1,13 +1,12 @@
 import asyncio
 import collections
+import threading
+import time
+
 from loguru import logger
 from typing_extensions import override
 
 from snaikenet_server.game.game_state import GameState, PlayerView
-from snaikenet_protocol import protocol
-import threading
-import time
-
 from snaikenet_server.game.grid import GridStructure
 from snaikenet_server.game.types import PlayerID, GridSize, Direction
 from snaikenet_server.server.server import SnaikenetServer
@@ -139,7 +138,7 @@ async def game_loop(game: Game, tick_interval: float, host: str, tcp_port: int, 
         maxlen=100
     )
 
-    while game.is_running():
+    while game.is_running() and len(game.get_living_players()):
         tick_start = time.perf_counter()
 
         game.tick()

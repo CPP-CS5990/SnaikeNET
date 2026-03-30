@@ -33,7 +33,13 @@ class SnaikenetClient:
 
     async def start(self):
         loop = asyncio.get_running_loop()
-        await self.connect()
+        # Attempt to connect to server until successful
+        while not hasattr(self, "_udp_transport") or self._udp_transport.is_closing():
+            try:
+                await self.connect()
+            except ConnectionError as e:
+                logger.error(f"Failed to connect to server: {e}")
+
         self._send_task = loop.create_task(self._send_direction_loop())
 
     async def connect(self):
@@ -162,12 +168,12 @@ class SnaikenetClient:
             self._client._udp_transport = transport
 
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
-            logger.debug(f"Received UDP message from {addr}: {data.decode().strip()}")
+            logger.debug(f"Received UDP message from {addr}: {data.hex()}")
             try:
                 self._client._event_handler.on_receive_game_state_frame(protocol.decode_player_game_state(data))
             except ValueError as _:
                 logger.error(
-                    f"Failed to decode game state frame from server: {data.decode().strip()}"
+                    f"Failed to decode game state frame from server: {data.hex()}"
                 )
                 return
 
