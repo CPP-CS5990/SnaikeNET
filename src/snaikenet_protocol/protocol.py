@@ -23,6 +23,7 @@ Bytes 10-...: Grid data (1 byte per tile, row-major order)
 GAME_HEADER_SIZE = 10
 PLAYER_GAME_STATE_HEADER_FORMAT = "!IBBHBB"
 
+
 class ServerCodec:
     @staticmethod
     def decode_direction(data_bytes: bytes) -> Direction | None:
@@ -44,13 +45,13 @@ class ServerCodec:
             case _:
                 return None
 
-
     @staticmethod
     def encode_player_game_state(
-            player_id: str, player_view: PlayerView, sequence_number: int
+        player_id: str, player_view: PlayerView, sequence_number: int
     ) -> bytes:
         result_size = (
-                player_view.viewport_size[0] * player_view.viewport_size[1] + GAME_HEADER_SIZE
+            player_view.viewport_size[0] * player_view.viewport_size[1]
+            + GAME_HEADER_SIZE
         )
         result = bytearray(result_size)
 
@@ -87,8 +88,8 @@ class ServerCodec:
 class ClientCodec:
     @staticmethod
     def decode_player_game_state(game_state_bytes: bytes) -> ClientGameStateFrame:
-        seq, vp_width, vp_height, player_length, num_kills, is_alive = struct.unpack_from(
-            PLAYER_GAME_STATE_HEADER_FORMAT, game_state_bytes, 0
+        seq, vp_width, vp_height, player_length, num_kills, is_alive = (
+            struct.unpack_from(PLAYER_GAME_STATE_HEADER_FORMAT, game_state_bytes, 0)
         )
         grid_bytes = game_state_bytes[GAME_HEADER_SIZE:]
 
@@ -120,7 +121,6 @@ class ClientCodec:
             grid_data=grid_data,
         )
 
-
     @staticmethod
     def new_connection_initial_tcp_message():
         return _to_json({"type": "new"})
@@ -137,4 +137,3 @@ class ClientCodec:
                 "direction": direction.value,
             }
         )
-

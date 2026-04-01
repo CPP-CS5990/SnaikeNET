@@ -5,10 +5,7 @@ from snaikenet_server.game.game_state import PlayerView
 from snaikenet_server.game.grid import TileType, TileData
 from snaikenet_client.types import ClientTileType
 
-from snaikenet_protocol.protocol import (
-    ServerCodec,
-    ClientCodec
-)
+from snaikenet_protocol.protocol import ServerCodec, ClientCodec
 from snaikenet_client.types import ClientDirection
 from snaikenet_server.game.types import Direction
 
@@ -49,7 +46,9 @@ def test_encode_player_game_state():
         is_alive=True,
     )
 
-    encoded = ServerCodec.encode_player_game_state(player_id, player_view, sequence_number=42)
+    encoded = ServerCodec.encode_player_game_state(
+        player_id, player_view, sequence_number=42
+    )
 
     assert len(encoded) == 10 + 3 * 5
 
@@ -115,7 +114,9 @@ def test_decode_player_game_state():
         is_alive=True,
     )
 
-    encoded = ServerCodec.encode_player_game_state(player_id, player_view, sequence_number=42)
+    encoded = ServerCodec.encode_player_game_state(
+        player_id, player_view, sequence_number=42
+    )
 
     decoded = ClientCodec.decode_player_game_state(encoded)
 

@@ -62,10 +62,15 @@ class Game:
             await asyncio.sleep(0.1)  # Sleep briefly to avoid busy waiting
 
     def restart_game(self):
-        all_players = self._game_state.get_living_players().union(self._game_state.get_dead_players())
+        all_players = self._game_state.get_living_players().union(
+            self._game_state.get_dead_players()
+        )
         logger.info(f"Restarting game, resetting state for players: {all_players}\n")
 
-        self._game_state = GameState(self._game_state.get_grid_size(), self._game_state.get_viewport_distance_from_center())
+        self._game_state = GameState(
+            self._game_state.get_grid_size(),
+            self._game_state.get_viewport_distance_from_center(),
+        )
         for player_id in all_players:
             self._game_state.add_new_player(player_id)
 
@@ -166,7 +171,9 @@ async def game_loop(
         if sleep_duration > 0:
             await asyncio.sleep(sleep_duration)
         else:
-            logger.warning(f"Tick {game.get_tick_index()} overran by {-sleep_duration:.4f}s\n")
+            logger.warning(
+                f"Tick {game.get_tick_index()} overran by {-sleep_duration:.4f}s\n"
+            )
 
         if game.get_tick_index() % 100 == 0:
             avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000

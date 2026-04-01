@@ -52,6 +52,7 @@ from snaikenet_server.server_commands import (
 )
 import asyncio
 
+
 def setup_logger(verbose: bool):
     logger.remove()
     level = "DEBUG" if verbose else "INFO"
