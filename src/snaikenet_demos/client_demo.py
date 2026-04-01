@@ -3,6 +3,7 @@ import asyncio
 
 from snaikenet_client.client.client_event_handler import SnaikenetClientEventHandler
 from snaikenet_client.client_data import ClientGameStateFrame
+from snaikenet_client.parse_args import parse_client_args
 from snaikenet_client.types import ClientDirection
 from loguru import logger
 import sys
@@ -16,14 +17,16 @@ def setup_logger(verbose: bool):
     )  # Log to file as well, with rotation
 
 async def main():
-    setup_logger(verbose=False)
+    args = parse_client_args()
+    setup_logger(verbose=args.verbose)
+
     class _MyClientEventHandler(SnaikenetClientEventHandler):
         def on_receive_game_state_frame(self, frame: ClientGameStateFrame):
             logger.debug(f"Received game state frame: {frame}")
 
     client = SnaikenetClient(
-        server_host="localhost",
-        server_tcp_port=8888,
+        server_host=args.host,
+        server_tcp_port=args.port,
         event_handler=_MyClientEventHandler()
     )
     await client.start()

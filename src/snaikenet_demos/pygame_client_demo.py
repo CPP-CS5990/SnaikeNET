@@ -10,6 +10,7 @@ from loguru import logger
 from snaikenet_client.client.client import SnaikenetClient
 from snaikenet_client.client.client_event_handler import SnaikenetClientEventHandler
 from snaikenet_client.client_data import ClientGameStateFrame
+from snaikenet_client.parse_args import parse_client_args
 from snaikenet_client.types import ClientDirection, ClientTileType
 
 TILE_SIZE = 24
@@ -88,10 +89,12 @@ def render_frame(screen: pygame.Surface, frame: ClientGameStateFrame, font: pyga
 async def run_client(
     handler: QueueClientEventHandler,
     direction_queue: queue.Queue[ClientDirection],
+    server_host: str = "localhost",
+    server_tcp_port: int = 8888,
 ):
     client = SnaikenetClient(
-        server_host="localhost",
-        server_tcp_port=8888,
+        server_host=server_host,
+        server_tcp_port=server_tcp_port,
         event_handler=handler,
     )
     await client.start()
@@ -113,17 +116,20 @@ async def run_client(
 def start_network_thread(
     handler: QueueClientEventHandler,
     direction_queue: queue.Queue[ClientDirection],
+    server_host: str = "localhost",
+    server_tcp_port: int = 8888,
 ):
     """Run asyncio with SelectorEventLoop in its own thread to avoid
     Windows ProactorEventLoop UDP issues and any pygame interference."""
     selector = selectors.SelectSelector()
     loop = asyncio.SelectorEventLoop(selector)
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_client(handler, direction_queue))
+    loop.run_until_complete(run_client(handler, direction_queue, server_host, server_tcp_port))
 
 
 def main():
-    setup_logger(verbose=False)
+    args = parse_client_args()
+    setup_logger(verbose=args.verbose)
 
     handler = QueueClientEventHandler()
     direction_queue: queue.Queue[ClientDirection] = queue.Queue()
@@ -131,7 +137,7 @@ def main():
     # Network runs in a background thread with its own SelectorEventLoop
     net_thread = threading.Thread(
         target=start_network_thread,
-        args=(handler, direction_queue),
+        args=(handler, direction_queue, args.host, args.port),
         daemon=True,
     )
     net_thread.start()
