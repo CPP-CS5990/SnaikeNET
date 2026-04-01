@@ -50,7 +50,9 @@ class QueueClientEventHandler(SnaikenetClientEventHandler):
         self.frame_queue: queue.Queue[ClientGameStateFrame] = queue.Queue()
 
     def on_receive_game_state_frame(self, frame: ClientGameStateFrame):
-        logger.debug(f"Received game state frame: seq={frame.sequence_number}, length={frame.player_length}, kills={frame.num_kills}, alive={frame.is_alive}")
+        logger.debug(
+            f"Received game state frame: seq={frame.sequence_number}, length={frame.player_length}, kills={frame.num_kills}, alive={frame.is_alive}"
+        )
         self.frame_queue.put(frame)
 
 
@@ -65,14 +67,18 @@ def drain_queue(q: queue.Queue[ClientGameStateFrame]) -> ClientGameStateFrame | 
     return latest
 
 
-def render_frame(screen: pygame.Surface, frame: ClientGameStateFrame, font: pygame.Font):
+def render_frame(
+    screen: pygame.Surface, frame: ClientGameStateFrame, font: pygame.Font
+):
     grid = frame.grid_data
     screen_w = len(grid) * TILE_SIZE
 
     for x, col in enumerate(grid):
         for y, tile in enumerate(col):
             color = COLORS.get(tile, (0, 0, 0))
-            rect = pygame.Rect(x * TILE_SIZE, SCOREBOARD_HEIGHT + y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            rect = pygame.Rect(
+                x * TILE_SIZE, SCOREBOARD_HEIGHT + y * TILE_SIZE, TILE_SIZE, TILE_SIZE
+            )
             pygame.draw.rect(screen, color, rect)
             pygame.draw.rect(screen, (40, 40, 40), rect, 1)
 
@@ -83,7 +89,9 @@ def render_frame(screen: pygame.Surface, frame: ClientGameStateFrame, font: pyga
     status_color = (80, 255, 120) if frame.is_alive else (255, 60, 60)
     info = f"Tick: {frame.sequence_number}    Length: {frame.player_length}    Kills: {frame.num_kills}    {status}"
     text_surface = font.render(info, True, status_color)
-    screen.blit(text_surface, (10, (SCOREBOARD_HEIGHT - text_surface.get_height()) // 2))
+    screen.blit(
+        text_surface, (10, (SCOREBOARD_HEIGHT - text_surface.get_height()) // 2)
+    )
 
 
 async def run_client(
@@ -124,7 +132,9 @@ def start_network_thread(
     selector = selectors.SelectSelector()
     loop = asyncio.SelectorEventLoop(selector)
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_client(handler, direction_queue, server_host, server_tcp_port))
+    loop.run_until_complete(
+        run_client(handler, direction_queue, server_host, server_tcp_port)
+    )
 
 
 def main():

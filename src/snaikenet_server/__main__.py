@@ -52,7 +52,7 @@ from snaikenet_server.server_commands import (
 )
 import asyncio
 
-TICK_RATE = 16
+TICK_RATE = 6
 TICK_INTERVAL = 1 / TICK_RATE
 
 
@@ -69,7 +69,7 @@ async def main():
     args = parse_args()
     setup_logger(args.verbose)
 
-    game = Game((128, 128), viewport_distance_from_center=(17, 17))
+    game = Game((64, 64), viewport_distance_from_center=(20, 20))
 
     def stop_server():
         game.stop_game()
@@ -83,15 +83,25 @@ async def main():
 
     # Create thread instances
     await asyncio.gather(
-        asyncio.create_task(game_loop(game, TICK_INTERVAL, host=args.host, tcp_port=args.tcp_port, udp_port=args.udp_port)),
+        asyncio.create_task(
+            game_loop(
+                game,
+                TICK_INTERVAL,
+                host=args.host,
+                tcp_port=args.tcp_port,
+                udp_port=args.udp_port,
+            )
+        ),
         asyncio.to_thread(console_loop, command_interface),
     )
+
 
 def run_main():
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Server shutting down due to keyboard interrupt")
+
 
 if __name__ == "__main__":
     run_main()

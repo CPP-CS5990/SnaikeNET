@@ -8,6 +8,7 @@ from snaikenet_client.types import ClientDirection
 from loguru import logger
 import sys
 
+
 def setup_logger(verbose: bool):
     logger.remove()
     level = "DEBUG" if verbose else "INFO"
@@ -15,6 +16,7 @@ def setup_logger(verbose: bool):
     logger.add(
         "logs/server.log", rotation="1 MB", level=level
     )  # Log to file as well, with rotation
+
 
 async def main():
     args = parse_client_args()
@@ -27,7 +29,7 @@ async def main():
     client = SnaikenetClient(
         server_host=args.host,
         server_tcp_port=args.port,
-        event_handler=_MyClientEventHandler()
+        event_handler=_MyClientEventHandler(),
     )
     await client.start()
     client.set_direction(ClientDirection.NORTH)

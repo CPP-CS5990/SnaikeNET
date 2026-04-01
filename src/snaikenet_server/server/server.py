@@ -7,7 +7,10 @@ from loguru import logger
 from snaikenet_protocol import protocol
 from snaikenet_server.game.game_state import PlayerView
 from snaikenet_server.server.connected_clients import ConnectedClients
-from snaikenet_server.server.server_event_handler import SnaikenetServerEventHandler, DefaultSnaikenetServerEventHandler
+from snaikenet_server.server.server_event_handler import (
+    SnaikenetServerEventHandler,
+    DefaultSnaikenetServerEventHandler,
+)
 
 
 class SnaikenetServer:
@@ -76,7 +79,9 @@ class SnaikenetServer:
         dest = self._connected_clients.get_client_by_id(client_id)
         if dest is not None:
             self._udp_transport.sendto(
-                protocol.encode_player_game_state(client_id, client_frame, sequence_number),
+                protocol.encode_player_game_state(
+                    client_id, client_frame, sequence_number
+                ),
                 dest.get_addr(),
             )
 
@@ -154,7 +159,9 @@ class SnaikenetServer:
                 case "reconnect":
                     client_id = msg.get("uuid")
                     if not self._connected_clients.has_client_id(client_id):
-                        writer.write(self._error_response("Unknown UUID: Cannot reconnect"))
+                        writer.write(
+                            self._error_response("Unknown UUID: Cannot reconnect")
+                        )
                         await writer.drain()
                         return
 

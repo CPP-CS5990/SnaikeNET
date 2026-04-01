@@ -3,7 +3,10 @@ import json
 
 from loguru import logger
 
-from snaikenet_client.client.client_event_handler import SnaikenetClientEventHandler, DefaultSnaikenetClientEventHandler
+from snaikenet_client.client.client_event_handler import (
+    SnaikenetClientEventHandler,
+    DefaultSnaikenetClientEventHandler,
+)
 from snaikenet_client.types import ClientDirection
 from snaikenet_protocol import protocol
 
@@ -24,7 +27,8 @@ class SnaikenetClient:
         server_tcp_port: int = 8888,
         server_host: str = "localhost",
         send_interval_ms: int = 50,
-        event_handler: SnaikenetClientEventHandler | None = DefaultSnaikenetClientEventHandler(),
+        event_handler: SnaikenetClientEventHandler
+        | None = DefaultSnaikenetClientEventHandler(),
     ):
         self._send_interval = send_interval_ms / 1000.0
         self._server_host = server_host
@@ -170,7 +174,9 @@ class SnaikenetClient:
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
             logger.debug(f"Received UDP message from {addr}: {data.hex()}")
             try:
-                self._client._event_handler.on_receive_game_state_frame(protocol.decode_player_game_state(data))
+                self._client._event_handler.on_receive_game_state_frame(
+                    protocol.decode_player_game_state(data)
+                )
             except ValueError as _:
                 logger.error(
                     f"Failed to decode game state frame from server: {data.hex()}"

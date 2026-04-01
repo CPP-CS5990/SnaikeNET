@@ -102,7 +102,9 @@ class Game:
         logger.info(f"Deleted player with ID: {player_id}\n")
 
 
-async def game_loop(game: Game, tick_interval: float, host: str, tcp_port: int, udp_port: int):
+async def game_loop(
+    game: Game, tick_interval: float, host: str, tcp_port: int, udp_port: int
+):
 
     class _GameEventHandler(SnaikenetServerEventHandler):
         @override
@@ -124,7 +126,12 @@ async def game_loop(game: Game, tick_interval: float, host: str, tcp_port: int, 
             with game.game_lock:
                 game.add_new_player(client_id)
 
-    server = SnaikenetServer(host=host, tcp_port=tcp_port, udp_port=udp_port, event_handler=_GameEventHandler())
+    server = SnaikenetServer(
+        host=host,
+        tcp_port=tcp_port,
+        udp_port=udp_port,
+        event_handler=_GameEventHandler(),
+    )
     await server.start()
     logger.info("Game thread started, waiting for start signal...\n")
     await game.wait_for_game_start()
@@ -134,9 +141,7 @@ async def game_loop(game: Game, tick_interval: float, host: str, tcp_port: int, 
     logger.info("Start signal received, entering game loop...\n")
     tick = 0
     next_tick_time = time.perf_counter()
-    tick_times = collections.deque(
-        maxlen=100
-    )
+    tick_times = collections.deque(maxlen=100)
 
     while game.is_running() and len(game.get_living_players()):
         tick_start = time.perf_counter()

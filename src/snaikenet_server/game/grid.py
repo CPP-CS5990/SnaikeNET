@@ -109,6 +109,7 @@ class Grid:
             viewport.append(row)
         return viewport
 
+
 class TileType(Enum):
     EMPTY = 0
     WALL = 1

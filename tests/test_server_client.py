@@ -53,7 +53,10 @@ async def test_client_send_and_receive_direction():
             self._received_client_id_future = loop.create_future()
 
         def futures_done(self) -> bool:
-            return self._received_direction_future.done() and self._received_client_id_future.done()
+            return (
+                self._received_direction_future.done()
+                and self._received_client_id_future.done()
+            )
 
         def on_new_client_connect(self, client_id: str):
             pass
@@ -63,22 +66,27 @@ async def test_client_send_and_receive_direction():
 
         def on_receive_direction(self, client_id: str, direction: Direction):
             if (
-                    self._received_client_id_future.done()
-                    or self._received_direction_future.done()
+                self._received_client_id_future.done()
+                or self._received_direction_future.done()
             ):
                 return
             self._received_direction_future.set_result(direction)
             self._received_client_id_future.set_result(client_id)
 
         async def wait_for_futures(self, timeout: float = 5.0) -> tuple[str, Direction]:
-            result =  await asyncio.wait_for(self._received_client_id_future, timeout=timeout), await asyncio.wait_for(self._received_direction_future, timeout=timeout)
+            result = (
+                await asyncio.wait_for(
+                    self._received_client_id_future, timeout=timeout
+                ),
+                await asyncio.wait_for(
+                    self._received_direction_future, timeout=timeout
+                ),
+            )
             return result
 
     event_handler = _TestDirectionUpdate()
     # Create and start server
-    server = SnaikenetServer(
-        event_handler=event_handler, tcp_port=0, udp_port=0
-    )
+    server = SnaikenetServer(event_handler=event_handler, tcp_port=0, udp_port=0)
     await server.start()
     asyncio.create_task(server.server_forever())
     print(f"Server started at {server.get_host()}:{server.get_udp_port()}")
@@ -123,6 +131,7 @@ async def test_server_broadcast():
 
     class _TestBroadcastEventHandler(SnaikenetClientEventHandler):
         _received_broadcast_future: asyncio.Future[ClientGameStateFrame]
+
         def on_receive_game_state_frame(self, frame: ClientGameStateFrame):
             if self._received_broadcast_future.done():
                 return
@@ -131,8 +140,12 @@ async def test_server_broadcast():
         def __init__(self):
             self._received_broadcast_future = loop.create_future()
 
-        async def wait_for_broadcast(self, timeout: float = 5.0) -> ClientGameStateFrame:
-            result = await asyncio.wait_for(self._received_broadcast_future, timeout=timeout)
+        async def wait_for_broadcast(
+            self, timeout: float = 5.0
+        ) -> ClientGameStateFrame:
+            result = await asyncio.wait_for(
+                self._received_broadcast_future, timeout=timeout
+            )
             return result
 
         def reset_future(self):
@@ -141,8 +154,9 @@ async def test_server_broadcast():
     event_handler = _TestBroadcastEventHandler()
     # Create and start client
     client = SnaikenetClient(
-        server_host=server.get_host(), server_tcp_port=server.get_tcp_port(),
-        event_handler=event_handler
+        server_host=server.get_host(),
+        server_tcp_port=server.get_tcp_port(),
+        event_handler=event_handler,
     )
     await client.start()
     client_id = client.get_client_id()
@@ -151,13 +165,25 @@ async def test_server_broadcast():
     player_view = PlayerView(
         viewport_size=(3, 3),
         viewport=[
-            [TileData(TileType.SNAKE), TileData(TileType.EMPTY), TileData(TileType.FOOD)],
-            [TileData(TileType.EMPTY), TileData(TileType.SNAKE), TileData(TileType.EMPTY)],
-            [TileData(TileType.FOOD), TileData(TileType.EMPTY), TileData(TileType.SNAKE)],
+            [
+                TileData(TileType.SNAKE),
+                TileData(TileType.EMPTY),
+                TileData(TileType.FOOD),
+            ],
+            [
+                TileData(TileType.EMPTY),
+                TileData(TileType.SNAKE),
+                TileData(TileType.EMPTY),
+            ],
+            [
+                TileData(TileType.FOOD),
+                TileData(TileType.EMPTY),
+                TileData(TileType.SNAKE),
+            ],
         ],
         kills=0,
         is_alive=True,
-        length=1
+        length=1,
     )
 
     server.broadcast_game_state_frames({client_id: player_view}, 0)
@@ -178,7 +204,6 @@ async def test_server_broadcast():
     assert broadcast.sequence_number == 1
     assert broadcast.player_length == 1
     assert broadcast.is_alive == False
-
 
     # We would need to implement a way for the client to receive broadcast messages in order to test this properly. For now, we will just assume that if the code reaches this point without errors, the broadcast was successful.
 
