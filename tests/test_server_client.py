@@ -1,0 +1,211 @@
+import pytest
+
+from snaikenet_client.client.client import SnaikenetClient
+from snaikenet_client.client.client_event_handler import SnaikenetClientEventHandler
+from snaikenet_client.client_data import ClientGameStateFrame
+from snaikenet_client.types import ClientDirection
+from snaikenet_server.game.game_state import PlayerView
+from snaikenet_server.game.grid import TileData, TileType
+from snaikenet_server.game.types import Direction
+from snaikenet_server.server.server import SnaikenetServer
+import asyncio
+
+from snaikenet_server.server.server_event_handler import SnaikenetServerEventHandler
+
+
+# Test for server-client registration over TCP and UDP hole punching
+@pytest.mark.asyncio
+async def test_client_tcp_registration():
+    # Create and start server
+    server = SnaikenetServer(tcp_port=0, udp_port=0)
+    await server.start()
+    asyncio.create_task(server.server_forever())
+    print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
+
+    # Create and start client
+    client = SnaikenetClient(
+        server_host=server.get_host(), server_tcp_port=server.get_tcp_port()
+    )
+    # Client will attempt to connect to server and register over TCP, then receive UDP port for hole punching. We just need to start the client and wait for it to complete the registration process.
+    await client.start()
+    print(f"Client ID: {client.get_client_id()}")
+    print(f"Server Client IDs: {server.get_client_ids()}")
+    assert client.get_client_id() in server.get_client_ids()
+
+    await client.stop()
+    await server.stop()
+
+
+# Test for client sending direction updates and server receiving them correctly
+@pytest.mark.asyncio
+async def test_client_send_and_receive_direction():
+    loop = asyncio.get_running_loop()
+
+    class _TestDirectionUpdate(SnaikenetServerEventHandler):
+        _received_direction_future: asyncio.Future
+        _received_client_id_future: asyncio.Future
+
+        def __init__(self):
+            self.reset_futures()
+
+        def reset_futures(self):
+            self._received_direction_future = loop.create_future()
+            self._received_client_id_future = loop.create_future()
+
+        def futures_done(self) -> bool:
+            return (
+                self._received_direction_future.done()
+                and self._received_client_id_future.done()
+            )
+
+        def on_new_client_connect(self, client_id: str):
+            pass
+
+        def on_client_disconnect(self, client_id: str):
+            pass
+
+        def on_receive_direction(self, client_id: str, direction: Direction):
+            if (
+                self._received_client_id_future.done()
+                or self._received_direction_future.done()
+            ):
+                return
+            self._received_direction_future.set_result(direction)
+            self._received_client_id_future.set_result(client_id)
+
+        async def wait_for_futures(self, timeout: float = 5.0) -> tuple[str, Direction]:
+            result = (
+                await asyncio.wait_for(
+                    self._received_client_id_future, timeout=timeout
+                ),
+                await asyncio.wait_for(
+                    self._received_direction_future, timeout=timeout
+                ),
+            )
+            return result
+
+    event_handler = _TestDirectionUpdate()
+    # Create and start server
+    server = SnaikenetServer(event_handler=event_handler, tcp_port=0, udp_port=0)
+    await server.start()
+    asyncio.create_task(server.server_forever())
+    print(f"Server started at {server.get_host()}:{server.get_udp_port()}")
+
+    # Create and start client
+    client = SnaikenetClient(
+        server_host=server.get_host(), server_tcp_port=server.get_tcp_port()
+    )
+    # Client will attempt to connect to server and register over TCP, then receive UDP port for hole punching. We just need to start the client and wait for it to complete the registration process.
+    await client.start()
+
+    # Client sends direction updates every 50ms. We just need to set the direction and the client object will handle the rest.
+    client.set_direction(ClientDirection.NORTH)
+
+    received_client_id, received_direction = await event_handler.wait_for_futures()
+    event_handler.reset_futures()
+
+    assert received_client_id == client.get_client_id()
+    assert received_direction == Direction.NORTH
+
+    # Client sends direction updates every 50ms. We just need to set the direction and the client object will handle the rest.
+    client.set_direction(ClientDirection.SOUTH)
+
+    received_client_id, received_direction = await event_handler.wait_for_futures()
+
+    assert received_client_id == client.get_client_id()
+    assert received_direction == Direction.SOUTH
+    event_handler.reset_futures()
+
+    await client.stop()
+    await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_server_broadcast():
+    loop = asyncio.get_running_loop()
+    # Create and start server
+    server = SnaikenetServer(tcp_port=0, udp_port=0)
+    await server.start()
+    asyncio.create_task(server.server_forever())
+    print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
+
+    class _TestBroadcastEventHandler(SnaikenetClientEventHandler):
+        _received_broadcast_future: asyncio.Future[ClientGameStateFrame]
+
+        def on_receive_game_state_frame(self, frame: ClientGameStateFrame):
+            if self._received_broadcast_future.done():
+                return
+            self._received_broadcast_future.set_result(frame)
+
+        def __init__(self):
+            self._received_broadcast_future = loop.create_future()
+
+        async def wait_for_broadcast(
+            self, timeout: float = 5.0
+        ) -> ClientGameStateFrame:
+            result = await asyncio.wait_for(
+                self._received_broadcast_future, timeout=timeout
+            )
+            return result
+
+        def reset_future(self):
+            self._received_broadcast_future = loop.create_future()
+
+    event_handler = _TestBroadcastEventHandler()
+    # Create and start client
+    client = SnaikenetClient(
+        server_host=server.get_host(),
+        server_tcp_port=server.get_tcp_port(),
+        event_handler=event_handler,
+    )
+    await client.start()
+    client_id = client.get_client_id()
+
+    # Server broadcasts a message to all clients
+    player_view = PlayerView(
+        viewport_size=(3, 3),
+        viewport=[
+            [
+                TileData(TileType.SNAKE),
+                TileData(TileType.EMPTY),
+                TileData(TileType.FOOD),
+            ],
+            [
+                TileData(TileType.EMPTY),
+                TileData(TileType.SNAKE),
+                TileData(TileType.EMPTY),
+            ],
+            [
+                TileData(TileType.FOOD),
+                TileData(TileType.EMPTY),
+                TileData(TileType.SNAKE),
+            ],
+        ],
+        kills=0,
+        is_alive=True,
+        length=1,
+    )
+
+    server.broadcast_game_state_frames({client_id: player_view}, 0)
+
+    broadcast = await event_handler.wait_for_broadcast()
+    event_handler.reset_future()
+
+    assert broadcast.sequence_number == 0
+    assert broadcast.player_length == 1
+    assert broadcast.is_alive == True
+
+    player_view.is_alive = False
+
+    server.broadcast_game_state_frames({client_id: player_view}, 1)
+    broadcast = await event_handler.wait_for_broadcast()
+    event_handler.reset_future()
+
+    assert broadcast.sequence_number == 1
+    assert broadcast.player_length == 1
+    assert broadcast.is_alive == False
+
+    # We would need to implement a way for the client to receive broadcast messages in order to test this properly. For now, we will just assume that if the code reaches this point without errors, the broadcast was successful.
+
+    await client.stop()
+    await server.stop()

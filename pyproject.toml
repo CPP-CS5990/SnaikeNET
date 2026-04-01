@@ -9,6 +9,7 @@ dependencies = [
     "loguru>=0.7.3",
     "numpy>=2.4.2",
     "pygame-ce>=2.5.7",
+    "ruff>=0.15.5",
 ]
 
 [build-system]
@@ -16,9 +17,9 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-server = "snaikenet.__main__:main"
-visualize_gamestate = "snaikenet.game.visualize_gamestate:main"
-prototype = "snaikenet.game.prototype_game:main"
+server = "snaikenet_server.__main__:run_main"
+visualize_gamestate = "snaikenet_server.game.visualize_gamestate:main"
+prototype = "snaikenet_server.game.prototype_game:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -26,7 +27,8 @@ where = ["src"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
-    "ruff>=0.15.5",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.15.6",
 ]
 
 [tool.pytest.ini_options]

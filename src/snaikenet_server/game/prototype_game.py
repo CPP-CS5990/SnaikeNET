@@ -3,9 +3,9 @@
 # be rendering the grid and responding to player input, but it may also print out when a player dies. It uses the Game::get_grid_iterator method
 import sys
 import pygame
-from snaikenet.game.game import Game
-from snaikenet.game.grid import TileType
-from snaikenet.game.types import Direction, PlayerID
+from snaikenet_server.game.game import Game
+from snaikenet_server.game.grid import TileType
+from snaikenet_server.game.types import Direction, PlayerID
 
 SCREEN_W = 1500
 SCREEN_H = 1000

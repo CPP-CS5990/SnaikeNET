@@ -4,6 +4,9 @@ import argparse
 class ArgNamespace(argparse.Namespace):
     headless: bool
     verbose: bool
+    tcp_port: int
+    udp_port: int
+    host: str
 
 
 def parse_args() -> ArgNamespace:
@@ -19,6 +22,24 @@ def parse_args() -> ArgNamespace:
         "-v",
         action="store_true",
         help="Enable verbose logging for debugging purposes.",
+    )
+    parser.add_argument(
+        "--tcp-port",
+        type=int,
+        default=8888,
+        help="TCP port for client registration (default: 8888)",
+    )
+    parser.add_argument(
+        "--udp-port",
+        type=int,
+        default=8888,
+        help="UDP port for game data communication (default: 8888)",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host/IP address to bind the server to (default: localhost)",
     )
     args = parser.parse_args(namespace=ArgNamespace())
     return args

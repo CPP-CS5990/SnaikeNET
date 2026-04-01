@@ -21,3 +21,14 @@ class Direction(Enum):
                 return Direction.WEST
             case Direction.WEST:
                 return Direction.EAST
+
+    def as_index(self) -> int:
+        match self:
+            case Direction.NORTH:
+                return 0
+            case Direction.SOUTH:
+                return 1
+            case Direction.EAST:
+                return 2
+            case Direction.WEST:
+                return 3

@@ -2,8 +2,8 @@ from enum import Enum
 
 from loguru import logger
 
-from snaikenet.game.list_dict import ListDict
-from snaikenet.game.types import GridSize, Position, PlayerID
+from snaikenet_server.game.list_dict import ListDict
+from snaikenet_server.game.types import GridSize, Position, PlayerID
 
 type GridStructure = list[list[TileData]]
 
@@ -107,25 +107,7 @@ class Grid:
                     wall_tile = TileData(tile_type=TileType.WALL)
                     row.append(wall_tile)
             viewport.append(row)
-        logger.debug(
-            f"Generated viewport for center position {center_position} with distance {distance_from_center}:\n{self.as_string(viewport)}\n"
-        )
         return viewport
-
-    def as_string(self, grid: GridStructure) -> str:
-        tile_symbols = {
-            TileType.EMPTY: ".",
-            TileType.WALL: "#",
-            TileType.FOOD: "*",
-            TileType.SNAKE: "S",
-        }
-        rows = []
-        for row in grid:
-            row_str = ""
-            for tile in row:
-                row_str += tile_symbols[tile.tile_type]
-            rows.append(row_str)
-        return "\n".join(rows)
 
 
 class TileType(Enum):
@@ -141,9 +123,11 @@ class TileData:
         PlayerID
     ]  # Multiple players can occupy the same tile temporarily during collisions
 
-    def __init__(self, tile_type: TileType = TileType.EMPTY):
+    def __init__(self, tile_type: TileType = TileType.EMPTY, player_ids=None):
+        if player_ids is None:
+            player_ids = []
         self.tile_type = tile_type
-        self.player_ids = []
+        self.player_ids = player_ids
 
     def add_player(self, player_id: PlayerID):
         if player_id not in self.player_ids:
