@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from loguru import logger
 
-from snaikenet_protocol import protocol
+from snaikenet_protocol.protocol import ServerCodec
 from snaikenet_server.game.game_state import PlayerView
 from snaikenet_server.server.connected_clients import ConnectedClients
 from snaikenet_server.server.server_event_handler import (
@@ -79,7 +79,7 @@ class SnaikenetServer:
         dest = self._connected_clients.get_client_by_id(client_id)
         if dest is not None:
             self._udp_transport.sendto(
-                protocol.encode_player_game_state(
+                ServerCodec.encode_player_game_state(
                     client_id, client_frame, sequence_number
                 ),
                 dest.get_addr(),
@@ -268,7 +268,7 @@ class SnaikenetServer:
                     client = self._server._connected_clients.get_client_by_addr(addr)
                     self._server._connected_clients.touch_client_by_id(client.get_id())
                     self._server._event_handler.on_receive_direction(
-                        client.get_id(), protocol.decode_direction(data)
+                        client.get_id(), ServerCodec.decode_direction(data)
                     )
                 else:
                     logger.debug(

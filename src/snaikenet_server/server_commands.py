@@ -8,10 +8,10 @@ COMMAND_RESTART = "restart"
 
 _HELP_MESSAGE = """
 Available commands:
-    - start: Start the game
-    - stop: Stop the game
-    - restart: Restart the game
-    - help: Show this help message
+    start   (s)  - Start the game
+    stop    (q)  - Stop the server
+    restart (r)  - Restart the game
+    help    (h)  - Show this help message
 """
 
 
@@ -27,9 +27,13 @@ class GameServerCommandInterface:
 
         self.commands = {
             "start": start_game,
+            "s": start_game,
             "stop": stop_server,
+            "q": stop_server,
             "restart": restart_game,
+            "r": restart_game,
             "help": self.help_message,
+            "h": self.help_message,
         }
 
     def help_message(self):

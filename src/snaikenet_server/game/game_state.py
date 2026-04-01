@@ -25,16 +25,8 @@ class GameState:
         self._grid = Grid(grid_size)
         self._viewport_distance_from_center = viewport_distance_from_center
 
-    def restart_game(self):
-        self._grid = Grid(self._grid.get_grid_size())
-        old_players = list(self._players.keys())
-        self._players.clear()
-        self._living_players.clear()
-        self._dead_players.clear()
-        self._kills.clear()
-        for old_player_id in old_players:
-            self.add_new_player(old_player_id)
-        self.initialize_game_state()
+    def get_viewport_distance_from_center(self) -> tuple[int, int]:
+        return self._viewport_distance_from_center
 
     def kill_player(self, player_id: PlayerID, killer: PlayerID | None = None):
         if killer is None:

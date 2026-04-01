@@ -4,12 +4,12 @@ import json
 from snaikenet_server.game.game_state import PlayerView
 from snaikenet_server.game.grid import TileType, TileData
 from snaikenet_client.types import ClientTileType
+
 from snaikenet_protocol.protocol import (
-    encode_player_game_state,
-    decode_player_game_state,
+    ServerCodec,
+    ClientCodec
 )
 from snaikenet_client.types import ClientDirection
-from snaikenet_protocol.protocol import encode_direction, decode_direction
 from snaikenet_server.game.types import Direction
 
 
@@ -49,7 +49,7 @@ def test_encode_player_game_state():
         is_alive=True,
     )
 
-    encoded = encode_player_game_state(player_id, player_view, sequence_number=42)
+    encoded = ServerCodec.encode_player_game_state(player_id, player_view, sequence_number=42)
 
     assert len(encoded) == 10 + 3 * 5
 
@@ -115,9 +115,9 @@ def test_decode_player_game_state():
         is_alive=True,
     )
 
-    encoded = encode_player_game_state(player_id, player_view, sequence_number=42)
+    encoded = ServerCodec.encode_player_game_state(player_id, player_view, sequence_number=42)
 
-    decoded = decode_player_game_state(encoded)
+    decoded = ClientCodec.decode_player_game_state(encoded)
 
     assert decoded.sequence_number == 42
     assert decoded.player_length == 3
@@ -143,24 +143,24 @@ def test_decode_player_game_state():
 
 
 def test_direction_encode_decode():
-    north_encoded = encode_direction(ClientDirection.NORTH)
-    south_encoded = encode_direction(ClientDirection.SOUTH)
-    east_encoded = encode_direction(ClientDirection.EAST)
-    west_encoded = encode_direction(ClientDirection.WEST)
+    north_encoded = ClientCodec.encode_direction(ClientDirection.NORTH)
+    south_encoded = ClientCodec.encode_direction(ClientDirection.SOUTH)
+    east_encoded = ClientCodec.encode_direction(ClientDirection.EAST)
+    west_encoded = ClientCodec.encode_direction(ClientDirection.WEST)
 
-    assert decode_direction(north_encoded) == Direction.NORTH
-    assert decode_direction(south_encoded) == Direction.SOUTH
-    assert decode_direction(east_encoded) == Direction.EAST
-    assert decode_direction(west_encoded) == Direction.WEST
+    assert ServerCodec.decode_direction(north_encoded) == Direction.NORTH
+    assert ServerCodec.decode_direction(south_encoded) == Direction.SOUTH
+    assert ServerCodec.decode_direction(east_encoded) == Direction.EAST
+    assert ServerCodec.decode_direction(west_encoded) == Direction.WEST
 
 
 def test_invalid_direction_decode():
     invalid_type = _to_json({"type": "new", "direction": "NORTH"})
     no_direction = _to_json({"type": "direction"})
     invalid_direction = _to_json({"type": "direction", "direction": 6})
-    assert decode_direction(invalid_type) is None
-    assert decode_direction(no_direction) is None
-    assert decode_direction(invalid_direction) is None
+    assert ServerCodec.decode_direction(invalid_type) is None
+    assert ServerCodec.decode_direction(no_direction) is None
+    assert ServerCodec.decode_direction(invalid_direction) is None
 
 
 def _to_json(dict_obj):

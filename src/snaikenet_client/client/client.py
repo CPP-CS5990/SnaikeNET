@@ -8,7 +8,7 @@ from snaikenet_client.client.client_event_handler import (
     DefaultSnaikenetClientEventHandler,
 )
 from snaikenet_client.types import ClientDirection
-from snaikenet_protocol import protocol
+from snaikenet_protocol.protocol import ClientCodec
 
 
 class SnaikenetClient:
@@ -57,7 +57,7 @@ class SnaikenetClient:
         logger.debug(
             f"Sending registration message to server at {self._server_host}:{self._server_tcp_port}"
         )
-        writer.write(self._new_connection_initial_tcp())
+        writer.write(ClientCodec.new_connection_initial_tcp_message())
         await writer.drain()
 
         response = await asyncio.wait_for(reader.read(500), timeout=5.0)
@@ -105,7 +105,7 @@ class SnaikenetClient:
         ):  # Send multiple times to increase chances of successful hole punching
             await asyncio.sleep(0.1)
             self._udp_transport.sendto(
-                self._to_json({"type": "hole_punch", "uuid": self._client_uuid})
+                ClientCodec.hole_punch_udp_message(self._client_uuid),
             )
 
         logger.debug(
@@ -144,20 +144,13 @@ class SnaikenetClient:
         logger.debug(
             f"Sending direction {self._direction} to server at {self._server_host}:{self._server_udp_port} via UDP"
         )
-        self._udp_transport.sendto(protocol.encode_direction(self._direction))
+        self._udp_transport.sendto(ClientCodec.encode_direction(self._direction))
 
     def set_direction(self, direction: ClientDirection):
         self._direction = direction
 
     def get_client_id(self) -> str | None:
         return self._client_uuid
-
-    @staticmethod
-    def _to_json(data: dict) -> bytes:
-        return json.dumps(data).encode() + b"\n"
-
-    def _new_connection_initial_tcp(self):
-        return self._to_json({"type": "new"})
 
     class _UdpProtocol(asyncio.DatagramProtocol):
         def __init__(self, client: "SnaikenetClient"):
@@ -175,7 +168,7 @@ class SnaikenetClient:
             logger.debug(f"Received UDP message from {addr}: {data.hex()}")
             try:
                 self._client._event_handler.on_receive_game_state_frame(
-                    protocol.decode_player_game_state(data)
+                    ClientCodec.decode_player_game_state(data)
                 )
             except ValueError as _:
                 logger.error(

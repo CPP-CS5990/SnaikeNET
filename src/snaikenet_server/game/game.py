@@ -15,6 +15,7 @@ from snaikenet_server.server.server_event_handler import SnaikenetServerEventHan
 
 class Game:
     game_lock: threading.Lock = threading.Lock()
+    _tick_index: int
     _game_state: GameState
     _start_event: threading.Event
     _stop_signal: bool = False
@@ -24,6 +25,7 @@ class Game:
         grid_size: GridSize,
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
+        self._tick_index = -1
         self._start_event = threading.Event()
         self._game_state = GameState(grid_size, viewport_distance_from_center)
 
@@ -32,6 +34,7 @@ class Game:
             self._game_state.handle_player_moves()
             self._game_state.handle_collisions()
             self._game_state.handle_food_spawning()
+            self._tick_index += 1
 
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         player_id = self._game_state.add_new_player(player_id)
@@ -49,11 +52,6 @@ class Game:
         logger.debug("Stop event received, stopping game loop...\n")
         self._start_event.set()  # Set the event to unblock the game loop if it's waiting
         self._stop_signal = True
-        self.cleanup()
-
-    def cleanup(self):
-        logger.debug("Cleaning up game resources...\n")
-        # Implement any necessary cleanup logic here (e.g., saving game state, closing connections, etc.)
 
     def is_running(self) -> bool:
         return not self._stop_signal
@@ -64,8 +62,16 @@ class Game:
             await asyncio.sleep(0.1)  # Sleep briefly to avoid busy waiting
 
     def restart_game(self):
-        self._game_state.restart_game()
+        all_players = self._game_state.get_living_players().union(self._game_state.get_dead_players())
+        logger.info(f"Restarting game, resetting state for players: {all_players}\n")
+
+        self._game_state = GameState(self._game_state.get_grid_size(), self._game_state.get_viewport_distance_from_center())
+        for player_id in all_players:
+            self._game_state.add_new_player(player_id)
+
+        self._tick_index = -1
         self._start_event.clear()
+        self.start_game()
 
     def get_grid_iterator(self):
         return self._game_state.get_grid_iterator()
@@ -100,6 +106,9 @@ class Game:
     def delete_player(self, player_id: PlayerID):
         self._game_state.delete_player(player_id)
         logger.info(f"Deleted player with ID: {player_id}\n")
+
+    def get_tick_index(self) -> int:
+        return self._tick_index
 
 
 async def game_loop(
@@ -139,18 +148,16 @@ async def game_loop(
     server.set_keep_accepting_new_clients(False)
 
     logger.info("Start signal received, entering game loop...\n")
-    tick = 0
     next_tick_time = time.perf_counter()
     tick_times = collections.deque(maxlen=100)
 
-    while game.is_running() and len(game.get_living_players()):
+    while game.is_running():
         tick_start = time.perf_counter()
 
         game.tick()
 
         player_states = game.get_player_states()
-        server.broadcast_game_state_frames(player_states, tick)
-        tick += 1
+        server.broadcast_game_state_frames(player_states, game.get_tick_index())
         tick_times.append(time.perf_counter() - tick_start)
 
         next_tick_time += tick_interval
@@ -159,14 +166,14 @@ async def game_loop(
         if sleep_duration > 0:
             await asyncio.sleep(sleep_duration)
         else:
-            logger.warning(f"Tick {tick} overran by {-sleep_duration:.4f}s\n")
+            logger.warning(f"Tick {game.get_tick_index()} overran by {-sleep_duration:.4f}s\n")
 
-        if tick % 100 == 0:
+        if game.get_tick_index() % 100 == 0:
             avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
             real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
             logger.debug(
-                f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
+                f"Tick {game.get_tick_index()} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
             )
 
-    game.cleanup()
-    logger.info("Game thread exiting...\n")
+    await server.stop()
+    logger.info("Game task exiting...\n")
