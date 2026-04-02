@@ -178,7 +178,6 @@ class GameState:
             )
             return False
 
-
         self._initialize_player_positions()
         self._initialize_food_positions()
         return True
@@ -269,12 +268,15 @@ class GameState:
         for player_id in self._dead_players:
             if len(living_players) > 0:
                 random_living_player = random.choice(living_players)
-                states[player_id] = self.create_player_state(random_living_player, is_spectating=True)
+                states[player_id] = self.create_player_state(
+                    random_living_player, is_spectating=True
+                )
 
         return states
 
-
-    def create_player_state(self, player_id: PlayerID, is_spectating: bool = False) -> PlayerView | None:
+    def create_player_state(
+        self, player_id: PlayerID, is_spectating: bool = False
+    ) -> PlayerView | None:
         player = self._players.get(player_id)
         if player is None:
             return None

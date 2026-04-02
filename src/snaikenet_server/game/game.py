@@ -68,13 +68,15 @@ class Game:
     def restart_game(self):
         with self.game_lock:
             all_players = list(self._game_state.get_all_players())
-            logger.info(f"Restarting game, resetting state for players: {all_players}\n")
+            logger.info(
+                f"Restarting game, resetting state for players: {all_players}\n"
+            )
 
             del self._game_state
             logger.info("Game state deleted, creating new game state...\n")
             self._game_state = GameState(
                 grid_size=self._grid_size,
-                viewport_distance_from_center=self._viewport_distance_from_center
+                viewport_distance_from_center=self._viewport_distance_from_center,
             )
             logger.info("New game state created, re-adding players...\n")
             for player_id in all_players:
