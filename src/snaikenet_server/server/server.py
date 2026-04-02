@@ -17,13 +17,13 @@ class SnaikenetServer:
     """
     Server for Snaikenet game
     TCP Registration:
-        1) Client: sends registration request over TCP {"type": "new"}
+        1) Client: sends registration request over TCP
         2) Server: generates UUID and ACKs back to client with UUID and UDP port to use for hole punching
         3) Client: sends a UDP datagram containing the UUID to the server's UDP port to complete registration
         4) Server: server reads NAT-mapped addr and registers the client with the UUID and NAT-mapped addr for future communication
 
     TCP Reconnection:
-        1) Client: sends reconnection request over TCP with UUID {"type": "reconnect", "uuid": "<client_uuid>"}
+        1) Client: sends reconnection request over TCP with UUID
         2) Server: validates UUID, responds with UDP port
         3) Client: Sends UDP datagram containing the UUID
         4) Server: updates client's NAT-mapped addr for future communication
