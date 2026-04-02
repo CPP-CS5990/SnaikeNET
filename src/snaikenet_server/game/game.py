@@ -19,6 +19,8 @@ class Game:
     _game_state: GameState
     _start_event: threading.Event
     _stop_signal: bool = False
+    _grid_size: GridSize
+    _viewport_distance_from_center: tuple[int, int]
 
     def __init__(
         self,
@@ -28,6 +30,8 @@ class Game:
         self._tick_index = -1
         self._start_event = threading.Event()
         self._game_state = GameState(grid_size, viewport_distance_from_center)
+        self._grid_size = grid_size
+        self._viewport_distance_from_center = viewport_distance_from_center
 
     def tick(self):
         with self.game_lock:
@@ -62,21 +66,29 @@ class Game:
             await asyncio.sleep(0.1)  # Sleep briefly to avoid busy waiting
 
     def restart_game(self):
-        all_players = self._game_state.get_living_players().union(
-            self._game_state.get_dead_players()
-        )
-        logger.info(f"Restarting game, resetting state for players: {all_players}\n")
+        with self.game_lock:
+            all_players = list(self._game_state.get_all_players())
+            logger.info(f"Restarting game, resetting state for players: {all_players}\n")
 
-        self._game_state = GameState(
-            self._game_state.get_grid_size(),
-            self._game_state.get_viewport_distance_from_center(),
-        )
-        for player_id in all_players:
-            self._game_state.add_new_player(player_id)
+            del self._game_state
+            logger.info("Game state deleted, creating new game state...\n")
+            self._game_state = GameState(
+                grid_size=self._grid_size,
+                viewport_distance_from_center=self._viewport_distance_from_center
+            )
+            logger.info("New game state created, re-adding players...\n")
+            for player_id in all_players:
+                self.add_new_player(player_id)
 
-        self._tick_index = -1
-        self._start_event.clear()
-        self.start_game()
+            logger.info(f"All players: {all_players} re-added to new game state.\n")
+            logger.info(f"Dead players after restart: {self.get_dead_players()}\n")
+            logger.info(f"Resetting tick index and start event...\n")
+
+            self._tick_index = -1
+            self._start_event.clear()
+
+            logger.info("Game state reset, starting new game...\n")
+            self.start_game()
 
     def get_grid_iterator(self):
         return self._game_state.get_grid_iterator()
@@ -87,26 +99,11 @@ class Game:
     def get_dead_players(self) -> set[PlayerID]:
         return self._game_state.get_dead_players()
 
-    def get_living_players(self) -> set[PlayerID]:
-        return self._game_state.get_living_players()
-
     def get_grid_size(self) -> GridSize:
         return self._game_state.get_grid_size()
 
-    def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
-        return self._game_state.get_player_viewport(player_id)
-
-    def get_player_viewports(self) -> dict[PlayerID, GridStructure]:
-        return self._game_state.get_player_viewports()
-
     def get_player_states(self) -> dict[PlayerID, PlayerView]:
         return self._game_state.get_player_states()
-
-    def get_player_viewport_iterator(self, player_id: PlayerID):
-        viewport = self.get_player_viewport(player_id)
-        for row in viewport:
-            for tile in row:
-                yield tile
 
     def delete_player(self, player_id: PlayerID):
         self._game_state.delete_player(player_id)

@@ -1,3 +1,4 @@
+import random
 import uuid
 
 import numpy as np
@@ -9,12 +10,11 @@ from snaikenet_server.game.types import PlayerID, GridSize, Position, Direction
 
 
 class GameState:
-    _players: dict[PlayerID, SnakePlayer] = {}
-    _kills: dict[PlayerID, PlayerID] = {}
-    _dead_players: set[PlayerID] = set()
-    _living_players: set[PlayerID] = set()
-    _grid: Grid
+    _players: dict[PlayerID, SnakePlayer]
+    _kills: dict[PlayerID, PlayerID]
+    _dead_players: set[PlayerID]
     _max_num_food: int = 1
+    _grid: Grid
     _viewport_distance_from_center: tuple[int, int]
 
     def __init__(
@@ -22,6 +22,9 @@ class GameState:
         grid_size: GridSize,
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
+        self._dead_players = set()
+        self._players = {}
+        self._kills = {}
         self._grid = Grid(grid_size)
         self._viewport_distance_from_center = viewport_distance_from_center
 
@@ -31,12 +34,11 @@ class GameState:
     def kill_player(self, player_id: PlayerID, killer: PlayerID | None = None):
         if killer is None:
             killer = player_id
-        player = self._players[player_id]
-        if player:
+        player = self._players.get(player_id, None)
+        if player is not None:
             self._kills[player_id] = killer
-            player.kill()
+            player.die()
             self._dead_players.add(player_id)
-            self._living_players.remove(player_id)
             for position in player:
                 self._grid.remove_player_at(
                     position, player_id
@@ -55,12 +57,11 @@ class GameState:
             (0, 0),  # Temporary position, will be set properly in initialize_game_state
             player_id,
         )
-        self._living_players.add(player_id)
         return player_id
 
     def set_player_direction(self, player_id: PlayerID, player_direction: Direction):
-        player = self._players[player_id]
-        if player:
+        player = self._players.get(player_id, None)
+        if player is not None:
             player.set_direction(player_direction)
 
     def get_player(self, player_id: PlayerID) -> SnakePlayer | None:
@@ -70,7 +71,7 @@ class GameState:
         return set(self._dead_players)
 
     def get_living_players(self) -> set[PlayerID]:
-        return set(self._living_players)
+        return set(self._players.keys() - self._dead_players)
 
     def delete_player(self, player_id: PlayerID) -> bool:
         if player_id not in self._players:
@@ -80,7 +81,7 @@ class GameState:
             self._grid.remove_player_at(
                 tail_position, player_id
             )  # Mark the old tail position as empty on the grid
-        del self._players[player_id]
+        self._players.pop(player_id)
         return True
 
     def position_outside_grid(self, position: Position) -> bool:
@@ -177,6 +178,7 @@ class GameState:
             )
             return False
 
+
         self._initialize_player_positions()
         self._initialize_food_positions()
         return True
@@ -258,11 +260,21 @@ class GameState:
         }
 
     def get_player_states(self) -> dict[PlayerID, PlayerView]:
-        return {
-            player_id: self.get_player_state(player_id) for player_id in self._players
-        }
+        states: dict[PlayerID, PlayerView] = {}
+        living_players = list(self.get_living_players())
 
-    def get_player_state(self, player_id: PlayerID) -> PlayerView | None:
+        for player_id in living_players:
+            states[player_id] = self.create_player_state(player_id)
+
+        for player_id in self._dead_players:
+            if len(living_players) > 0:
+                random_living_player = random.choice(living_players)
+                states[player_id] = self.create_player_state(random_living_player, is_spectating=True)
+
+        return states
+
+
+    def create_player_state(self, player_id: PlayerID, is_spectating: bool = False) -> PlayerView | None:
         player = self._players.get(player_id)
         if player is None:
             return None
@@ -274,9 +286,12 @@ class GameState:
             ),
             length=len(player),
             kills=sum(1 for killer in self._kills.values() if killer == player_id),
-            is_alive=not player.is_dead(),
+            is_alive=is_spectating or not player.is_dead(),
             viewport=self.get_player_viewport(player_id),
         )
+
+    def get_all_players(self):
+        return set(self._players.keys())
 
 
 class PlayerView:
