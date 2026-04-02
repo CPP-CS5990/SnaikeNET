@@ -146,7 +146,9 @@ class SnaikenetServer:
             match req_type:
                 case "new":
                     if not self._keep_accepting_new_clients:
-                        writer.write(ServerCodec.error_response("Not accepting new clients"))
+                        writer.write(
+                            ServerCodec.error_response("Not accepting new clients")
+                        )
                         await writer.drain()
                         return
                     client_id = str(uuid4())
@@ -178,7 +180,9 @@ class SnaikenetServer:
             fut = loop.create_future()
             self._pending_clients[client_id] = fut
 
-            writer.write(ServerCodec.udp_hole_punch_success_request(client_id, self._udp_port))
+            writer.write(
+                ServerCodec.udp_hole_punch_success_request(client_id, self._udp_port)
+            )
             logger.debug(
                 f"Sending hole punch request to client {client_id} at TCP {peer}"
             )
@@ -218,7 +222,6 @@ class SnaikenetServer:
         finally:
             writer.close()
             await writer.wait_closed()
-
 
     class _UdpProtocol(asyncio.DatagramProtocol):
         def __init__(self, server: "SnaikenetServer"):
