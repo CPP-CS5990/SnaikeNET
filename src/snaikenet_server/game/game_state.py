@@ -47,9 +47,7 @@ class GameState:
                 # After removing the player from the grid, we place food at positions that don't have another player.
                 # This ensures that food doesn't spawn on top of a player that just killed this player where the players intersected
                 if not self._grid.has_player_at(position):
-                    self._grid.place_food_at(
-                        position
-                    )
+                    self._grid.place_food_at(position)
         else:
             logger.warning("Tried killing player that doesn't exist", player_id)
 
