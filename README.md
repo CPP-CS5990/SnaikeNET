@@ -12,5 +12,17 @@ This is a multiplayer snake game server implemented in Python
 - You can also use the gamestate visualizer with `uv run visualize_gamestate`
 - You can also use PyCharm and import the project as a `uv` project, then run the `src/snaikenet/__main__.py` file.
 
+### Running server
+
+```bash
+uv run server
+```
+
+### Running pygame client demo
+
+```bash
+uv run pygame_client_demo
+```
+
 ## Supported Python Versions
 - Python=3.14

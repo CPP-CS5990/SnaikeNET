@@ -20,6 +20,7 @@ build-backend = "setuptools.build_meta"
 server = "snaikenet_server.__main__:run_main"
 visualize_gamestate = "snaikenet_server.game.visualize_gamestate:main"
 prototype = "snaikenet_server.game.prototype_game:main"
+pygame_client_demo = "snaikenet_demos.pygame_client_demo:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
