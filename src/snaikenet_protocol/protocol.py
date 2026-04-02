@@ -84,6 +84,20 @@ class ServerCodec:
 
         return bytes(result)
 
+    @staticmethod
+    def udp_hole_punch_success_request(client_id: str, udp_port: int) -> bytes:
+        return _to_json(
+            {"status": "ok", "uuid": client_id, "udp_port": udp_port}
+        )
+
+    @staticmethod
+    def udp_hole_punch_success_response() -> bytes:
+        return _to_json({"status": "registered"})
+
+    @staticmethod
+    def error_response(reason: str) -> bytes:
+        return _to_json({"status": "error", "reason": reason})
+
 
 class ClientCodec:
     @staticmethod

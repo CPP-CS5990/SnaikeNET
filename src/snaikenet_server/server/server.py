@@ -146,7 +146,7 @@ class SnaikenetServer:
             match req_type:
                 case "new":
                     if not self._keep_accepting_new_clients:
-                        writer.write(self._error_response("Not accepting new clients"))
+                        writer.write(ServerCodec.error_response("Not accepting new clients"))
                         await writer.drain()
                         return
                     client_id = str(uuid4())
@@ -160,7 +160,7 @@ class SnaikenetServer:
                     client_id = msg.get("uuid")
                     if not self._connected_clients.has_client_id(client_id):
                         writer.write(
-                            self._error_response("Unknown UUID: Cannot reconnect")
+                            ServerCodec.error_response("Unknown UUID: Cannot reconnect")
                         )
                         await writer.drain()
                         return
@@ -170,7 +170,7 @@ class SnaikenetServer:
                         f"Client with UUID {client_id} is reconnecting from {peer}"
                     )
                 case _:
-                    writer.write(self._error_response("Invalid request type"))
+                    writer.write(ServerCodec.error_response("Invalid request type"))
                     await writer.drain()
                     return
 
@@ -178,7 +178,7 @@ class SnaikenetServer:
             fut = loop.create_future()
             self._pending_clients[client_id] = fut
 
-            writer.write(self._udp_hole_punch_request(client_id))
+            writer.write(ServerCodec.udp_hole_punch_success_request(client_id, self._udp_port))
             logger.debug(
                 f"Sending hole punch request to client {client_id} at TCP {peer}"
             )
@@ -196,7 +196,7 @@ class SnaikenetServer:
                         client_id
                     )  # Clear any registration for this client since hole punch failed
                 logger.warning(f"Hole punch timed out for client {client_id}")
-                writer.write(self._error_response("Hole punch timed out"))
+                writer.write(ServerCodec.error_response("Hole punch timed out"))
                 await writer.drain()
                 return
 
@@ -208,31 +208,17 @@ class SnaikenetServer:
             logger.info(
                 f"Client {client_id} hole-punched successfully with external address {external_addr}. Sending registration success response to TCP {peer}"
             )
-            writer.write(self._udp_hole_punch_success_response())
+            writer.write(ServerCodec.udp_hole_punch_success_response())
             await asyncio.wait_for(writer.drain(), timeout=5.0)
 
         except (json.JSONDecodeError, KeyError) as e:
             logger.debug(f"Invalid registration request from {peer}: {e}")
-            writer.write(self._error_response("Invalid registration request"))
+            writer.write(ServerCodec.error_response("Invalid registration request"))
             await writer.drain()
         finally:
             writer.close()
             await writer.wait_closed()
 
-    @staticmethod
-    def _to_json(data: dict) -> bytes:
-        return json.dumps(data).encode() + b"\n"
-
-    def _error_response(self, reason: str) -> bytes:
-        return self._to_json({"status": "error", "reason": reason})
-
-    def _udp_hole_punch_request(self, client_id: str) -> bytes:
-        return self._to_json(
-            {"status": "ok", "uuid": client_id, "udp_port": self._udp_port}
-        )
-
-    def _udp_hole_punch_success_response(self) -> bytes:
-        return self._to_json({"status": "registered"})
 
     class _UdpProtocol(asyncio.DatagramProtocol):
         def __init__(self, server: "SnaikenetServer"):

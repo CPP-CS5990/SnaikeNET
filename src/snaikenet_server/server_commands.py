@@ -36,7 +36,8 @@ class GameServerCommandInterface:
             "h": self.help_message,
         }
 
-    def help_message(self):
+    @staticmethod
+    def help_message():
         logger.debug(_HELP_MESSAGE)
         # We print it since instead of log because we are trying to show it to the user, not just log it for debugging purposes
         print(_HELP_MESSAGE)
@@ -78,7 +79,7 @@ class GameServerCommandInterface:
 
 def console_loop(command_interface: GameServerCommandInterface):
     # Always run and listen for console commands
-    command_interface.help_message()  # Show available commands on startup
+    GameServerCommandInterface.help_message()  # Show available commands on startup
     while command_interface.not_stopped():
         command = input()
         # Process console commands here
