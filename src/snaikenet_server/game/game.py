@@ -7,7 +7,6 @@ from loguru import logger
 from typing_extensions import override
 
 from snaikenet_server.game.game_state import GameState, PlayerView
-from snaikenet_server.game.grid import GridStructure
 from snaikenet_server.game.types import PlayerID, GridSize, Direction
 from snaikenet_server.server.server import SnaikenetServer
 from snaikenet_server.server.server_event_handler import SnaikenetServerEventHandler
@@ -32,6 +31,12 @@ class Game:
         self._game_state = GameState(grid_size, viewport_distance_from_center)
         self._grid_size = grid_size
         self._viewport_distance_from_center = viewport_distance_from_center
+
+    def viewport_size(self) -> tuple[int, int]:
+        return (
+            self._viewport_distance_from_center[0] * 2 + 1,
+            self._viewport_distance_from_center[1] * 2 + 1,
+        )
 
     def tick(self):
         with self.game_lock:
@@ -107,6 +112,9 @@ class Game:
     def get_player_states(self) -> dict[PlayerID, PlayerView]:
         return self._game_state.get_player_states()
 
+    def all_players_dead(self) -> bool:
+        return self._game_state.all_players_dead()
+
     def delete_player(self, player_id: PlayerID):
         self._game_state.delete_player(player_id)
         logger.info(f"Deleted player with ID: {player_id}\n")
@@ -125,8 +133,9 @@ async def game_loop(
             # Handle incoming datagram from clients (e.g., player input)
             with game.game_lock:
                 game.set_player_direction(
-                    client_id, direction
-                )  # Placeholder, replace with actual direction decoding
+                    client_id,
+                    direction
+                )
 
         @override
         def on_client_disconnect(self, client_id: str):
@@ -150,6 +159,11 @@ async def game_loop(
     await game.wait_for_game_start()
     # Once the game starts, stop accepting new clients
     server.set_keep_accepting_new_clients(False)
+    server.broadcast_game_start(game.viewport_size())
+    for i in range(3, 0, -1):
+        logger.info(f"Game starting in {i}...\n")
+        server.broadcast_game_about_to_start(i)
+        await asyncio.sleep(1)
 
     logger.info("Start signal received, entering game loop...\n")
     next_tick_time = time.perf_counter()
@@ -180,6 +194,18 @@ async def game_loop(
             logger.debug(
                 f"Tick {game.get_tick_index()} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
             )
+
+        # If all players are dead, restart the game
+        if game.all_players_dead():
+            logger.info(
+                f"All players are dead at tick {game.get_tick_index()}, restarting game...\n"
+            )
+            server.broadcast_game_restart()
+            game.restart_game()
+            for i in range(3, 0, -1):
+                logger.info(f"Game starting in {i}...\n")
+                server.broadcast_game_about_to_start(i)
+                await asyncio.sleep(1)
 
     await server.stop()
     logger.info("Game task exiting...\n")

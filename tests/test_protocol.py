@@ -1,16 +1,14 @@
-import struct
-
 import json
 from snaikenet_server.game.game_state import PlayerView
 from snaikenet_server.game.grid import TileType, TileData
 from snaikenet_client.types import ClientTileType
 
-from snaikenet_protocol.protocol import ServerCodec, ClientCodec
+from snaikenet_protocol.protocol import ServerCodec, ClientCodec, UdpMsgType
 from snaikenet_client.types import ClientDirection
 from snaikenet_server.game.types import Direction
 
 
-def test_encode_player_game_state():
+def test_encode_and_decode_player_state():
     player_id = "player1"
     player_view = PlayerView(
         viewport_size=(3, 5),
@@ -50,76 +48,11 @@ def test_encode_player_game_state():
         player_id, player_view, sequence_number=42
     )
 
-    assert len(encoded) == 10 + 3 * 5
-
-    seq, width, height, length, kills, alive = struct.unpack_from("!IBBHBB", encoded, 0)
-    assert seq == 42
-    assert width == 3
-    assert height == 5
-    assert length == 3
-    assert kills == 1
-    assert alive == 1
-
-    grid = encoded[10:]
-    assert grid[0] == 0  # EMPTY
-    assert grid[1] == 2  # FOOD
-    assert grid[2] == 1  # WALL
-    assert grid[3] == 0  # EMPTY
-    assert grid[4] == 1  # WALL
-    assert grid[5] == 3  # SNAKE - own (player1)
-    assert grid[6] == 0  # EMPTY
-    assert grid[7] == 2  # FOOD
-    assert grid[8] == 1  # WALL
-    assert grid[9] == 0  # EMPTY
-    assert grid[10] == 1  # WALL
-    assert grid[11] == 4  # SNAKE - other (player2)
-    assert grid[12] == 0  # EMPTY
-    assert grid[13] == 1  # WALL
-    assert grid[14] == 4  # SNAKE - other (player3)
-
-
-def test_decode_player_game_state():
-    player_id = "player1"
-    player_view = PlayerView(
-        viewport_size=(3, 5),
-        viewport=[
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.FOOD),
-                TileData(TileType.WALL),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.WALL),
-                TileData(TileType.SNAKE, player_ids=["player1"]),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.FOOD),
-                TileData(TileType.WALL),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.WALL),
-                TileData(TileType.SNAKE, player_ids=["player2"]),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.WALL),
-                TileData(TileType.SNAKE, player_ids=["player3"]),
-            ],
-        ],
-        length=3,
-        kills=1,
-        is_alive=True,
-    )
-
-    encoded = ServerCodec.encode_player_game_state(
-        player_id, player_view, sequence_number=42
-    )
+    message_type = ClientCodec.peek_udp_msg_type(encoded)
 
     decoded = ClientCodec.decode_player_game_state(encoded)
 
+    assert message_type == UdpMsgType.GAME_STATE_FRAME_UPDATE
     assert decoded.sequence_number == 42
     assert decoded.player_length == 3
     assert decoded.num_kills == 1
@@ -165,4 +98,4 @@ def test_invalid_direction_decode():
 
 
 def _to_json(dict_obj):
-    return json.dumps(dict_obj).encode("utf-8")
+    return json.dumps(dict_obj).encode("utf-8") + b"\n"

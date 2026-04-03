@@ -67,13 +67,31 @@ class SnaikenetServer:
     def set_keep_accepting_new_clients(self, keep_accepting_new_clients: bool):
         self._keep_accepting_new_clients = keep_accepting_new_clients
 
+    def broadcast_game_start(self, viewport_size: tuple[int, int]):
+        for dest in self._connected_clients.get_client_addrs():
+            self._udp_transport.sendto(
+                ServerCodec.encode_game_start(viewport_size), dest
+            )
+
+    def broadcast_game_restart(self):
+        for dest in self._connected_clients.get_client_addrs():
+            self._udp_transport.sendto(
+                ServerCodec.encode_game_restart(), dest
+            )
+
+    def broadcast_game_end(self):
+        for dest in self._connected_clients.get_client_addrs():
+            self._udp_transport.sendto(
+                ServerCodec.encode_game_end(), dest
+            )
+
     def broadcast_game_state_frames(
         self, client_frames: dict[str, PlayerView], sequence_number: int
     ):
         for uuid, frame in client_frames.items():
-            self.broadcast_game_state_frame(uuid, frame, sequence_number)
+            self._broadcast_game_state_frame(uuid, frame, sequence_number)
 
-    def broadcast_game_state_frame(
+    def _broadcast_game_state_frame(
         self, client_id: str, client_frame: PlayerView, sequence_number: int
     ):
         dest = self._connected_clients.get_client_by_id(client_id)
@@ -123,6 +141,7 @@ class SnaikenetServer:
             logger.info("Stopping TCP server...")
             self._tcp_server.close()
             await self._tcp_server.wait_closed()
+        self.broadcast_game_end()
         logger.info("Snaikenet server stopped.")
 
     async def _handle_registration(
@@ -263,3 +282,10 @@ class SnaikenetServer:
                     logger.debug(
                         f"Received UDP message from unknown address {addr}: {msg}"
                     )
+
+    def broadcast_game_about_to_start(self, seconds_until_start: int):
+        for client in self._connected_clients.get_clients():
+            dest = client.get_addr()
+            self._udp_transport.sendto(
+                ServerCodec.encode_game_about_to_start(seconds_until_start), dest
+            )

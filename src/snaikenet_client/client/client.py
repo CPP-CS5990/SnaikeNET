@@ -8,7 +8,7 @@ from snaikenet_client.client.client_event_handler import (
     DefaultSnaikenetClientEventHandler,
 )
 from snaikenet_client.types import ClientDirection
-from snaikenet_protocol.protocol import ClientCodec
+from snaikenet_protocol.protocol import ClientCodec, UdpMsgType
 
 
 class SnaikenetClient:
@@ -167,9 +167,24 @@ class SnaikenetClient:
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
             logger.debug(f"Received UDP message from {addr}: {data.hex()}")
             try:
-                self._client._event_handler.on_receive_game_state_frame(
-                    ClientCodec.decode_player_game_state(data)
-                )
+                match(UdpMsgType.peek_msg_type(data)):
+                    case UdpMsgType.GAME_START:
+                        self._client._event_handler.on_game_start(
+                            ClientCodec.decode_game_start(data)
+                        )
+                    case UdpMsgType.GAME_RESTART:
+                        self._client._event_handler.on_game_restart()
+                    case UdpMsgType.GAME_STATE_FRAME_UPDATE:
+                        self._client._event_handler.on_game_state_update(
+                            ClientCodec.decode_player_game_state(data)
+                        )
+                    case UdpMsgType.GAME_ABOUT_TO_START:
+                        self._client._event_handler.on_game_about_to_start(
+                            ClientCodec.decode_game_about_to_start(data)
+                        )
+                    case UdpMsgType.GAME_END:
+                        self._client._event_handler.on_game_end()
+
             except ValueError as _:
                 logger.error(
                     f"Failed to decode game state frame from server: {data.hex()}"

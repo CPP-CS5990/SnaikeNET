@@ -297,6 +297,9 @@ class GameState:
     def get_all_players(self):
         return set(self._players.keys())
 
+    def all_players_dead(self):
+        return len(self._dead_players) == len(self._players)
+
 
 class PlayerView:
     viewport_size: tuple[int, int]
