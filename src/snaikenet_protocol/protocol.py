@@ -13,18 +13,24 @@ from snaikenet_client.client_data import ClientGameStateFrame
 def _to_json(data: dict) -> bytes:
     return json.dumps(data).encode("utf-8") + b"\n"
 
+
 class UdpMsgType(Enum):
     # Additional header formats shouldn't include the order since the header already specifies it, and should be in network byte order (big-endian)
-    GAME_STATE_FRAME_UPDATE =   (0x01, "!IBBHBB")  # sequence number, viewport width, viewport height, player length, num kills, is alive. Followed by grid data (1 byte per tile, row-major order)
-    GAME_START =                (0x02, "!BB")  # viewport width, viewport height
-    GAME_END =                  (0x03, None)
-    GAME_RESTART =              (0x04, None)
-    GAME_ABOUT_TO_START =       (0x05, "!B")  # seconds until start
+    GAME_STATE_FRAME_UPDATE = (
+        0x01,
+        "!IBBHBB",
+    )  # sequence number, viewport width, viewport height, player length, num kills, is alive. Followed by grid data (1 byte per tile, row-major order)
+    GAME_START = (0x02, "!BB")  # viewport width, viewport height
+    GAME_END = (0x03, None)
+    GAME_RESTART = (0x04, None)
+    GAME_ABOUT_TO_START = (0x05, "!B")  # seconds until start
 
     def __init__(self, type_id: int, additional_header_fmt: str | None):
         self.type_id = type_id
         self.additional_header_fmt = additional_header_fmt
-        self.additional_header_size = struct.calcsize(additional_header_fmt) if additional_header_fmt else 0
+        self.additional_header_size = (
+            struct.calcsize(additional_header_fmt) if additional_header_fmt else 0
+        )
 
     @property
     def full_fmt(self) -> str:
@@ -41,7 +47,9 @@ class UdpMsgType(Enum):
 
     # Unpacking the additional header fields (not including the message type) from the data
     def unpack_from(self, data: bytes) -> tuple:
-        return struct.unpack_from(self.additional_header_fmt, data, _HEADER_MSG_TYPE_SIZE)
+        return struct.unpack_from(
+            self.additional_header_fmt, data, _HEADER_MSG_TYPE_SIZE
+        )
 
     @classmethod
     def peek_msg_type(cls, data: bytes, offset: int = 0) -> UdpMsgType:
@@ -51,9 +59,11 @@ class UdpMsgType(Enum):
             raise ValueError(f"Unknown message type ID: {type_id}")
         return _MSG_BY_ID[type_id]
 
+
 _HEADER_MSG_TYPE_FMT = "!B"  # Message type (1 byte, unsigned char)
 _HEADER_MSG_TYPE_SIZE = struct.calcsize(_HEADER_MSG_TYPE_FMT)
 _MSG_BY_ID: dict[int, UdpMsgType] = {m.type_id: m for m in UdpMsgType}
+
 
 class ServerCodec:
     @staticmethod
@@ -90,17 +100,16 @@ class ServerCodec:
 
     @staticmethod
     def encode_player_game_state(
-            player_id: str, player_view: PlayerView, sequence_number: int
+        player_id: str, player_view: PlayerView, sequence_number: int
     ) -> bytes:
         header_size = UdpMsgType.GAME_STATE_FRAME_UPDATE.full_size
         message_size = (
-                header_size +
-                player_view.viewport_size[0] * player_view.viewport_size[1]
+            header_size + player_view.viewport_size[0] * player_view.viewport_size[1]
         )
         message = bytearray(message_size)
 
         UdpMsgType.GAME_STATE_FRAME_UPDATE.pack_into(
-           message,
+            message,
             0,
             sequence_number,
             player_view.viewport_size[0],
@@ -141,19 +150,13 @@ class ServerCodec:
     @staticmethod
     def encode_game_end() -> bytes:
         message = bytearray(UdpMsgType.GAME_END.full_size)
-        UdpMsgType.GAME_END.pack_into(
-            message,
-            0
-        )
+        UdpMsgType.GAME_END.pack_into(message, 0)
         return bytes(message)
 
     @staticmethod
     def encode_game_restart() -> bytes:
         message = bytearray(UdpMsgType.GAME_RESTART.full_size)
-        UdpMsgType.GAME_RESTART.pack_into(
-            message,
-            0
-        )
+        UdpMsgType.GAME_RESTART.pack_into(message, 0)
         return bytes(message)
 
     @staticmethod
@@ -177,10 +180,14 @@ class ClientCodec:
         message_type = UdpMsgType.peek_msg_type(message_bytes)  # Validate message type
 
         if message_type != UdpMsgType.GAME_STATE_FRAME_UPDATE:
-            raise ValueError(f"Invalid message type for game state frame: {message_type}")
+            raise ValueError(
+                f"Invalid message type for game state frame: {message_type}"
+            )
 
         header_size = UdpMsgType.GAME_STATE_FRAME_UPDATE.full_size
-        seq, vp_width, vp_height, player_length, num_kills, is_alive = UdpMsgType.GAME_STATE_FRAME_UPDATE.unpack_from(message_bytes)
+        seq, vp_width, vp_height, player_length, num_kills, is_alive = (
+            UdpMsgType.GAME_STATE_FRAME_UPDATE.unpack_from(message_bytes)
+        )
 
         grid_bytes = message_bytes[header_size:]
 
@@ -228,9 +235,13 @@ class ClientCodec:
         message_type = UdpMsgType.peek_msg_type(message_bytes)  # Validate message type
 
         if message_type != UdpMsgType.GAME_ABOUT_TO_START:
-            raise ValueError(f"Invalid message type for game about to start: {message_type}")
+            raise ValueError(
+                f"Invalid message type for game about to start: {message_type}"
+            )
 
-        (seconds_until_start,) = UdpMsgType.GAME_ABOUT_TO_START.unpack_from(message_bytes)
+        (seconds_until_start,) = UdpMsgType.GAME_ABOUT_TO_START.unpack_from(
+            message_bytes
+        )
 
         return seconds_until_start
 

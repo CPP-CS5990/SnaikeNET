@@ -132,10 +132,7 @@ async def game_loop(
         def on_receive_direction(self, client_id: str, direction: Direction):
             # Handle incoming datagram from clients (e.g., player input)
             with game.game_lock:
-                game.set_player_direction(
-                    client_id,
-                    direction
-                )
+                game.set_player_direction(client_id, direction)
 
         @override
         def on_client_disconnect(self, client_id: str):

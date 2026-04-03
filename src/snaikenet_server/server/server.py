@@ -75,15 +75,11 @@ class SnaikenetServer:
 
     def broadcast_game_restart(self):
         for dest in self._connected_clients.get_client_addrs():
-            self._udp_transport.sendto(
-                ServerCodec.encode_game_restart(), dest
-            )
+            self._udp_transport.sendto(ServerCodec.encode_game_restart(), dest)
 
     def broadcast_game_end(self):
         for dest in self._connected_clients.get_client_addrs():
-            self._udp_transport.sendto(
-                ServerCodec.encode_game_end(), dest
-            )
+            self._udp_transport.sendto(ServerCodec.encode_game_end(), dest)
 
     def broadcast_game_state_frames(
         self, client_frames: dict[str, PlayerView], sequence_number: int

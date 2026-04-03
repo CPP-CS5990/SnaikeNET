@@ -3,6 +3,7 @@ Note to agent: Do not delete this comment
 Pygame client demo for SnaikeNET
 This client is completely vibecoded and not intended to be production quality. It is only meant for testing purposes.
 """
+
 import asyncio
 import dataclasses
 import queue
@@ -280,7 +281,9 @@ def main():
         grid_pixel_w = vw * tile_size
         grid_pixel_h = vh * tile_size
         grid_offset_x = (WINDOW_WIDTH - grid_pixel_w) // 2
-        grid_offset_y = SCOREBOARD_HEIGHT + (WINDOW_HEIGHT - SCOREBOARD_HEIGHT - grid_pixel_h) // 2
+        grid_offset_y = (
+            SCOREBOARD_HEIGHT + (WINDOW_HEIGHT - SCOREBOARD_HEIGHT - grid_pixel_h) // 2
+        )
 
     while running:
         for event in pygame.event.get():
@@ -323,16 +326,26 @@ def main():
         if phase == ClientPhase.WAITING:
             if viewport_w > 0 and viewport_h > 0:
                 render_empty_grid(
-                    screen, font, viewport_w, viewport_h,
-                    tile_size, grid_offset_x, grid_offset_y,
+                    screen,
+                    font,
+                    viewport_w,
+                    viewport_h,
+                    tile_size,
+                    grid_offset_x,
+                    grid_offset_y,
                 )
             else:
                 render_waiting(screen, font)
         elif phase == ClientPhase.COUNTDOWN:
             if viewport_w > 0 and viewport_h > 0:
                 render_empty_grid(
-                    screen, font, viewport_w, viewport_h,
-                    tile_size, grid_offset_x, grid_offset_y,
+                    screen,
+                    font,
+                    viewport_w,
+                    viewport_h,
+                    tile_size,
+                    grid_offset_x,
+                    grid_offset_y,
                 )
             render_countdown(screen, big_font, countdown_seconds)
         elif phase == ClientPhase.PLAYING and current_frame is not None:
@@ -342,14 +355,22 @@ def main():
             if grid_w != viewport_w or grid_h != viewport_h:
                 update_grid_layout(grid_w, grid_h)
             render_frame(
-                screen, current_frame, font,
-                tile_size, grid_offset_x, grid_offset_y,
+                screen,
+                current_frame,
+                font,
+                tile_size,
+                grid_offset_x,
+                grid_offset_y,
             )
         elif phase == ClientPhase.GAME_OVER:
             if current_frame is not None:
                 render_frame(
-                    screen, current_frame, font,
-                    tile_size, grid_offset_x, grid_offset_y,
+                    screen,
+                    current_frame,
+                    font,
+                    tile_size,
+                    grid_offset_x,
+                    grid_offset_y,
                 )
 
         pygame.display.flip()

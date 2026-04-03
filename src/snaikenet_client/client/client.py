@@ -167,7 +167,7 @@ class SnaikenetClient:
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
             logger.debug(f"Received UDP message from {addr}: {data.hex()}")
             try:
-                match(UdpMsgType.peek_msg_type(data)):
+                match UdpMsgType.peek_msg_type(data):
                     case UdpMsgType.GAME_START:
                         self._client._event_handler.on_game_start(
                             ClientCodec.decode_game_start(data)

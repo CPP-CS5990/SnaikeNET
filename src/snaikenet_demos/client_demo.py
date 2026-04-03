@@ -38,7 +38,6 @@ async def main():
         def on_game_state_update(self, frame: ClientGameStateFrame):
             logger.debug(f"Received game state frame: {frame}")
 
-
     client = SnaikenetClient(
         server_host=args.host,
         server_tcp_port=args.port,
