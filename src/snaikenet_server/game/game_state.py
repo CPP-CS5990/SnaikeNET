@@ -10,23 +10,18 @@ from snaikenet_server.game.types import PlayerID, GridSize, Position, Direction
 
 
 class GameState:
-    _players: dict[PlayerID, SnakePlayer]
-    _kills: dict[PlayerID, PlayerID]
-    _dead_players: set[PlayerID]
-    _max_num_food: int = 1
-    _grid: Grid
-    _viewport_distance_from_center: tuple[int, int]
-
     def __init__(
         self,
         grid_size: GridSize,
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
-        self._dead_players = set()
-        self._players = {}
-        self._kills = {}
-        self._grid = Grid(grid_size)
-        self._viewport_distance_from_center = viewport_distance_from_center
+        self._dead_players: set[PlayerID] = set()
+        self._players: dict[PlayerID, SnakePlayer] = {}
+        self._kills: dict[PlayerID, PlayerID] = {}
+        self._grid: Grid = Grid(grid_size)
+        self._viewport_distance_from_center: tuple[int, int] = viewport_distance_from_center
+        self._spectators: dict[PlayerID, PlayerID] = {}
+        self._max_num_food: int = 1
 
     def get_viewport_distance_from_center(self) -> tuple[int, int]:
         return self._viewport_distance_from_center
@@ -87,6 +82,8 @@ class GameState:
                 tail_position, player_id
             )  # Mark the old tail position as empty on the grid
         self._players.pop(player_id)
+        self._spectators.pop(player_id)
+        self._dead_players.remove(player_id)
         return True
 
     def position_outside_grid(self, position: Position) -> bool:
@@ -189,7 +186,7 @@ class GameState:
 
     def _initialize_food_positions(self):
         self._grid.fill_available_food_positions()
-        self._max_num_food = max(1, len(self._players) * 3)
+        self._max_num_food = max(1, len(self._players) * 5)
         for _ in range(self._max_num_food):
             food_position = self._grid.get_random_available_food_position()
             if food_position is not None:
@@ -265,9 +262,12 @@ class GameState:
 
         for player_id in self._dead_players:
             if len(living_players) > 0:
-                random_living_player = random.choice(living_players)
+                spectatee = self._spectators.get(player_id, None)
+                if spectatee is None or spectatee not in living_players:
+                    spectatee = random.choice(living_players)
+                    self._spectators[player_id] = spectatee
                 player_state = self.create_player_state(
-                    random_living_player, is_spectating=True
+                    spectatee, is_spectating=True
                 )
                 if player_state is not None:
                     states[player_id] = player_state
