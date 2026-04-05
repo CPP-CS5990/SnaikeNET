@@ -220,7 +220,7 @@ async def run_client(
                 new_dir = direction_queue.get_nowait()
                 if new_dir is not None:
                     logger.info(f"Got direction from queue: {new_dir}")
-                client.set_direction(new_dir)
+                    client.set_direction(new_dir)
             except queue.Empty:
                 break
 
@@ -308,7 +308,9 @@ def main():
                 current_frame = None
                 phase = ClientPhase.WAITING
             elif ev.kind == "countdown":
-                countdown_seconds = ev.seconds_until_start
+                countdown_seconds = (
+                    ev.seconds_until_start if ev.seconds_until_start else -1
+                )
                 if phase != ClientPhase.PLAYING:
                     phase = ClientPhase.COUNTDOWN
             elif ev.kind == "frame":
