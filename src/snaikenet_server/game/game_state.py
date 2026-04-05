@@ -19,7 +19,9 @@ class GameState:
         self._players: dict[PlayerID, SnakePlayer] = {}
         self._kills: dict[PlayerID, PlayerID] = {}
         self._grid: Grid = Grid(grid_size)
-        self._viewport_distance_from_center: tuple[int, int] = viewport_distance_from_center
+        self._viewport_distance_from_center: tuple[int, int] = (
+            viewport_distance_from_center
+        )
         self._spectators: dict[PlayerID, PlayerID] = {}
         self._max_num_food: int = 1
 
@@ -266,9 +268,7 @@ class GameState:
                 if spectatee is None or spectatee not in living_players:
                     spectatee = random.choice(living_players)
                     self._spectators[player_id] = spectatee
-                player_state = self.create_player_state(
-                    spectatee, is_spectating=True
-                )
+                player_state = self.create_player_state(spectatee, is_spectating=True)
                 if player_state is not None:
                     states[player_id] = player_state
 
