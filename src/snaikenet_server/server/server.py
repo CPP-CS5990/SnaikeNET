@@ -277,7 +277,9 @@ class SnaikenetServer:
                     self._server._connected_clients.touch_client_by_id(client.get_id())
                     decoded_direction = ServerCodec.decode_direction(data)
                     if decoded_direction is None:
-                        raise ValueError(f"Invalid direction message from {addr}: {msg}")
+                        raise ValueError(
+                            f"Invalid direction message from {addr}: {msg}"
+                        )
                     self._server._event_handler.on_receive_direction(
                         client.get_id(), decoded_direction
                     )

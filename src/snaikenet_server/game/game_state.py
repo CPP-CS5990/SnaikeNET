@@ -266,7 +266,9 @@ class GameState:
         for player_id in self._dead_players:
             if len(living_players) > 0:
                 random_living_player = random.choice(living_players)
-                player_state = self.create_player_state(random_living_player, is_spectating=True)
+                player_state = self.create_player_state(
+                    random_living_player, is_spectating=True
+                )
                 if player_state is not None:
                     states[player_id] = player_state
 
