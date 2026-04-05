@@ -77,8 +77,6 @@ class Game:
                 f"Restarting game, resetting state for players: {all_players}\n"
             )
 
-            del self._game_state
-            logger.info("Game state deleted, creating new game state...\n")
             self._game_state = GameState(
                 grid_size=self._grid_size,
                 viewport_distance_from_center=self._viewport_distance_from_center,
@@ -157,10 +155,7 @@ async def game_loop(
     # Once the game starts, stop accepting new clients
     server.set_keep_accepting_new_clients(False)
     server.broadcast_game_start(game.viewport_size())
-    for i in range(3, 0, -1):
-        logger.info(f"Game starting in {i}...\n")
-        server.broadcast_game_about_to_start(i)
-        await asyncio.sleep(1)
+    await server.wait_start_game_timer(3)
 
     logger.info("Start signal received, entering game loop...\n")
     next_tick_time = time.perf_counter()
@@ -199,10 +194,9 @@ async def game_loop(
             )
             server.broadcast_game_restart()
             game.restart_game()
-            for i in range(3, 0, -1):
-                logger.info(f"Game starting in {i}...\n")
-                server.broadcast_game_about_to_start(i)
-                await asyncio.sleep(1)
+            await server.wait_start_game_timer(3)
+            tick_times = collections.deque(maxlen=100)
+            next_tick_time = time.perf_counter()
 
     await server.stop()
     logger.info("Game task exiting...\n")

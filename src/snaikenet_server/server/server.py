@@ -36,8 +36,8 @@ class SnaikenetServer:
     # Temporary storage for pending hole-punching requests: UUID -> Future that will be set with (host, port) when UDP datagram is received
     _pending_clients: dict[str, asyncio.Future[tuple[str, int]]]
     _keep_accepting_new_clients: bool
-    _udp_transport: asyncio.DatagramTransport | None = None
-    _tcp_server: asyncio.Server | None = None
+    _udp_transport: asyncio.DatagramTransport
+    _tcp_server: asyncio.Server
     _event_handler: SnaikenetServerEventHandler
 
     def __init__(
@@ -130,6 +130,7 @@ class SnaikenetServer:
             await self._tcp_server.serve_forever()
 
     async def stop(self):
+        self.broadcast_game_end()
         if self._udp_transport:
             logger.info("Stopping UDP server...")
             self._udp_transport.close()
@@ -137,7 +138,6 @@ class SnaikenetServer:
             logger.info("Stopping TCP server...")
             self._tcp_server.close()
             await self._tcp_server.wait_closed()
-        self.broadcast_game_end()
         logger.info("Snaikenet server stopped.")
 
     async def _handle_registration(
@@ -208,7 +208,9 @@ class SnaikenetServer:
                     fut, timeout=10.0
                 )
             except asyncio.TimeoutError:
-                await self._pending_clients.pop(client_id, None)
+                pending_client = self._pending_clients.pop(client_id, None)
+                if pending_client:
+                    await pending_client
 
                 if req_type == "new":
                     self._connected_clients.pop_client_by_id(
@@ -268,16 +270,19 @@ class SnaikenetServer:
                     )
                     return
             elif msg_type == "direction":
-                if self._server._connected_clients.has_client_addr(addr):
+                try:
                     client = self._server._connected_clients.get_client_by_addr(addr)
+                    if client is None:
+                        raise ValueError(f"No registered client with address {addr}")
                     self._server._connected_clients.touch_client_by_id(client.get_id())
+                    decoded_direction = ServerCodec.decode_direction(data)
+                    if decoded_direction is None:
+                        raise ValueError(f"Invalid direction message from {addr}: {msg}")
                     self._server._event_handler.on_receive_direction(
-                        client.get_id(), ServerCodec.decode_direction(data)
+                        client.get_id(), decoded_direction
                     )
-                else:
-                    logger.debug(
-                        f"Received UDP message from unknown address {addr}: {msg}"
-                    )
+                except ValueError as e:
+                    logger.debug(e)
 
     def broadcast_game_about_to_start(self, seconds_until_start: int):
         for client in self._connected_clients.get_clients():
@@ -285,3 +290,9 @@ class SnaikenetServer:
             self._udp_transport.sendto(
                 ServerCodec.encode_game_about_to_start(seconds_until_start), dest
             )
+
+    async def wait_start_game_timer(self, seconds_until_start: int):
+        for i in range(seconds_until_start, 0, -1):
+            logger.info(f"Game starting in {i}...\n")
+            self.broadcast_game_about_to_start(i)
+            await asyncio.sleep(1)

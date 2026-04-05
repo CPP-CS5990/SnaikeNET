@@ -32,11 +32,12 @@ class GameState:
         return self._viewport_distance_from_center
 
     def kill_player(self, player_id: PlayerID, killer: PlayerID | None = None):
-        if killer is None:
-            killer = player_id
         player = self._players.get(player_id, None)
         if player is not None:
-            self._kills[player_id] = killer
+            if killer is None:
+                self._kills[player_id] = player_id
+            else:
+                self._kills[player_id] = killer
             player.die()
             self._dead_players.add(player_id)
             for position in player:
@@ -54,12 +55,14 @@ class GameState:
     # Adds a new player to the game state
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         if player_id is None:
-            player_id = str(uuid.uuid4())
-        self._players[player_id] = SnakePlayer(
+            player_id_ = str(uuid.uuid4())
+        else:
+            player_id_ = player_id
+        self._players[player_id_] = SnakePlayer(
             (0, 0),  # Temporary position, will be set properly in initialize_game_state
-            player_id,
+            player_id_,
         )
-        return player_id
+        return player_id_
 
     def set_player_direction(self, player_id: PlayerID, player_direction: Direction):
         player = self._players.get(player_id, None)
@@ -245,34 +248,27 @@ class GameState:
             self._players[player_id] = SnakePlayer((x, y), player_id)
             self._grid.add_player_at((x, y), player_id)
 
-    def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
+    def get_player_viewport(self, player: SnakePlayer) -> GridStructure:
         return self._grid.get_viewport(
-            self._players.get(player_id).get_head_position(),
+            player.get_head_position(),
             self._viewport_distance_from_center,
         )
-
-    def get_player_viewports(self):
-        return {
-            player_id: self._grid.get_viewport(
-                self._players.get(player_id).get_head_position(),
-                self._viewport_distance_from_center,
-            )
-            for player_id in self._players
-        }
 
     def get_player_states(self) -> dict[PlayerID, PlayerView]:
         states: dict[PlayerID, PlayerView] = {}
         living_players = list(self.get_living_players())
 
         for player_id in living_players:
-            states[player_id] = self.create_player_state(player_id)
+            player_state = self.create_player_state(player_id)
+            if player_state is not None:
+                states[player_id] = player_state
 
         for player_id in self._dead_players:
             if len(living_players) > 0:
                 random_living_player = random.choice(living_players)
-                states[player_id] = self.create_player_state(
-                    random_living_player, is_spectating=True
-                )
+                player_state = self.create_player_state(random_living_player, is_spectating=True)
+                if player_state is not None:
+                    states[player_id] = player_state
 
         return states
 
@@ -291,7 +287,7 @@ class GameState:
             length=len(player),
             kills=sum(1 for killer in self._kills.values() if killer == player_id),
             is_alive=is_spectating or not player.is_dead(),
-            viewport=self.get_player_viewport(player_id),
+            viewport=self.get_player_viewport(player),
         )
 
     def get_all_players(self):

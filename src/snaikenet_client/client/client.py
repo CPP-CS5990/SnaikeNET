@@ -16,10 +16,10 @@ class SnaikenetClient:
     _udp_transport: asyncio.DatagramTransport
     _server_host: str
     _server_tcp_port: int
-    _server_udp_port: int | None = None
-    _client_uuid: str | None = None
-    _direction: ClientDirection | None = None
-    _send_task: asyncio.Task | None = None
+    _server_udp_port: int | None
+    _client_uuid: str | None
+    _direction: ClientDirection | None
+    _send_task: asyncio.Task | None
     _event_handler: SnaikenetClientEventHandler
 
     def __init__(
@@ -27,8 +27,7 @@ class SnaikenetClient:
         server_tcp_port: int = 8888,
         server_host: str = "localhost",
         send_interval_ms: int = 50,
-        event_handler: SnaikenetClientEventHandler
-        | None = DefaultSnaikenetClientEventHandler(),
+        event_handler: SnaikenetClientEventHandler = DefaultSnaikenetClientEventHandler(),
     ):
         self._send_interval = send_interval_ms / 1000.0
         self._server_host = server_host
@@ -64,9 +63,6 @@ class SnaikenetClient:
         response_json = json.loads(response.decode("utf-8").strip())
 
         if response_json.get("status") != "ok":
-            logger.error(
-                f"Failed to connect to server: {response_json.get('error', 'Unknown error')}"
-            )
             raise ConnectionError(
                 f"Failed to connect to server: {response_json.get('error', 'Unknown error')}"
             )
@@ -76,7 +72,6 @@ class SnaikenetClient:
             self._client_uuid = uuid
             logger.info(f"Server responded with UUID {uuid}")
         else:
-            logger.error("Failed to connect to server: No UUID received")
             raise ConnectionError("Failed to connect to server: No UUID received")
 
         udp_port = response_json.get("udp_port")
@@ -98,14 +93,14 @@ class SnaikenetClient:
 
         # UDP hole punching:
         logger.debug(
-            f"Sending UDP hole-punching datagram to server at {self._server_host}:{self._server_udp_port} with UUID {self._client_uuid}"
+            f"Sending UDP hole-punching datagram to server at {self._server_host}:{self._server_udp_port} with UUID {uuid}"
         )
         for _ in range(
             5
         ):  # Send multiple times to increase chances of successful hole punching
             await asyncio.sleep(0.1)
             self._udp_transport.sendto(
-                ClientCodec.hole_punch_udp_message(self._client_uuid),
+                ClientCodec.hole_punch_udp_message(uuid),
             )
 
         logger.debug(

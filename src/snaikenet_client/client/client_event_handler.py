@@ -1,7 +1,4 @@
 from abc import ABC, abstractmethod
-from queue import Queue
-
-import loguru
 
 from snaikenet_client.client_data import ClientGameStateFrame
 
