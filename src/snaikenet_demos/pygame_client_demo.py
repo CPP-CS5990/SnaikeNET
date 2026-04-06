@@ -85,7 +85,10 @@ class QueueClientEventHandler(SnaikenetClientEventHandler):
         self.event_queue.put(ClientEvent(kind="frame", frame=frame))
         if self._curr_sequence_number + 1 != frame.sequence_number:
             logger.warning(f"Out of order sequence numbers: {frame.sequence_number}")
-        self._curr_sequence_number = frame.sequence_number
+
+        # ignore missed packets since they don't matter anymore
+        if self._curr_sequence_number < frame.sequence_number:
+            self._curr_sequence_number = frame.sequence_number
 
     def _reset_current_sequence_number(self):
         self._curr_sequence_number = -1
