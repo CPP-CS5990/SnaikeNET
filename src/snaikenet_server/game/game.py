@@ -7,7 +7,6 @@ from loguru import logger
 from typing_extensions import override
 
 from snaikenet_server.game.game_state import GameState, PlayerView
-from snaikenet_server.game.grid import GridStructure
 from snaikenet_server.game.types import PlayerID, GridSize, Direction
 from snaikenet_server.server.server import SnaikenetServer
 from snaikenet_server.server.server_event_handler import SnaikenetServerEventHandler
@@ -15,23 +14,36 @@ from snaikenet_server.server.server_event_handler import SnaikenetServerEventHan
 
 class Game:
     game_lock: threading.Lock = threading.Lock()
+    _tick_index: int
     _game_state: GameState
     _start_event: threading.Event
     _stop_signal: bool = False
+    _grid_size: GridSize
+    _viewport_distance_from_center: tuple[int, int]
 
     def __init__(
         self,
         grid_size: GridSize,
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
+        self._tick_index = -1
         self._start_event = threading.Event()
         self._game_state = GameState(grid_size, viewport_distance_from_center)
+        self._grid_size = grid_size
+        self._viewport_distance_from_center = viewport_distance_from_center
+
+    def viewport_size(self) -> tuple[int, int]:
+        return (
+            self._viewport_distance_from_center[0] * 2 + 1,
+            self._viewport_distance_from_center[1] * 2 + 1,
+        )
 
     def tick(self):
         with self.game_lock:
             self._game_state.handle_player_moves()
             self._game_state.handle_collisions()
             self._game_state.handle_food_spawning()
+            self._tick_index += 1
 
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         player_id = self._game_state.add_new_player(player_id)
@@ -49,11 +61,6 @@ class Game:
         logger.debug("Stop event received, stopping game loop...\n")
         self._start_event.set()  # Set the event to unblock the game loop if it's waiting
         self._stop_signal = True
-        self.cleanup()
-
-    def cleanup(self):
-        logger.debug("Cleaning up game resources...\n")
-        # Implement any necessary cleanup logic here (e.g., saving game state, closing connections, etc.)
 
     def is_running(self) -> bool:
         return not self._stop_signal
@@ -64,8 +71,29 @@ class Game:
             await asyncio.sleep(0.1)  # Sleep briefly to avoid busy waiting
 
     def restart_game(self):
-        self._game_state.restart_game()
-        self._start_event.clear()
+        with self.game_lock:
+            all_players = list(self._game_state.get_all_players())
+            logger.info(
+                f"Restarting game, resetting state for players: {all_players}\n"
+            )
+
+            self._game_state = GameState(
+                grid_size=self._grid_size,
+                viewport_distance_from_center=self._viewport_distance_from_center,
+            )
+            logger.info("New game state created, re-adding players...\n")
+            for player_id in all_players:
+                self.add_new_player(player_id)
+
+            logger.info(f"All players: {all_players} re-added to new game state.\n")
+            logger.info(f"Dead players after restart: {self.get_dead_players()}\n")
+            logger.info(f"Resetting tick index and start event...\n")
+
+            self._tick_index = -1
+            self._start_event.clear()
+
+            logger.info("Game state reset, starting new game...\n")
+            self.start_game()
 
     def get_grid_iterator(self):
         return self._game_state.get_grid_iterator()
@@ -76,30 +104,21 @@ class Game:
     def get_dead_players(self) -> set[PlayerID]:
         return self._game_state.get_dead_players()
 
-    def get_living_players(self) -> set[PlayerID]:
-        return self._game_state.get_living_players()
-
     def get_grid_size(self) -> GridSize:
         return self._game_state.get_grid_size()
-
-    def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
-        return self._game_state.get_player_viewport(player_id)
-
-    def get_player_viewports(self) -> dict[PlayerID, GridStructure]:
-        return self._game_state.get_player_viewports()
 
     def get_player_states(self) -> dict[PlayerID, PlayerView]:
         return self._game_state.get_player_states()
 
-    def get_player_viewport_iterator(self, player_id: PlayerID):
-        viewport = self.get_player_viewport(player_id)
-        for row in viewport:
-            for tile in row:
-                yield tile
+    def all_players_dead(self) -> bool:
+        return self._game_state.all_players_dead()
 
     def delete_player(self, player_id: PlayerID):
         self._game_state.delete_player(player_id)
         logger.info(f"Deleted player with ID: {player_id}\n")
+
+    def get_tick_index(self) -> int:
+        return self._tick_index
 
 
 async def game_loop(
@@ -111,9 +130,7 @@ async def game_loop(
         def on_receive_direction(self, client_id: str, direction: Direction):
             # Handle incoming datagram from clients (e.g., player input)
             with game.game_lock:
-                game.set_player_direction(
-                    client_id, direction
-                )  # Placeholder, replace with actual direction decoding
+                game.set_player_direction(client_id, direction)
 
         @override
         def on_client_disconnect(self, client_id: str):
@@ -137,20 +154,20 @@ async def game_loop(
     await game.wait_for_game_start()
     # Once the game starts, stop accepting new clients
     server.set_keep_accepting_new_clients(False)
+    server.broadcast_game_start(game.viewport_size())
+    await server.wait_start_game_timer(3)
 
     logger.info("Start signal received, entering game loop...\n")
-    tick = 0
     next_tick_time = time.perf_counter()
     tick_times = collections.deque(maxlen=100)
 
-    while game.is_running() and len(game.get_living_players()):
+    while game.is_running():
         tick_start = time.perf_counter()
 
         game.tick()
 
         player_states = game.get_player_states()
-        server.broadcast_game_state_frames(player_states, tick)
-        tick += 1
+        server.broadcast_game_state_frames(player_states, game.get_tick_index())
         tick_times.append(time.perf_counter() - tick_start)
 
         next_tick_time += tick_interval
@@ -159,14 +176,27 @@ async def game_loop(
         if sleep_duration > 0:
             await asyncio.sleep(sleep_duration)
         else:
-            logger.warning(f"Tick {tick} overran by {-sleep_duration:.4f}s\n")
+            logger.warning(
+                f"Tick {game.get_tick_index()} overran by {-sleep_duration:.4f}s\n"
+            )
 
-        if tick % 100 == 0:
+        if game.get_tick_index() % 100 == 0:
             avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
             real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
             logger.debug(
-                f"Tick {tick} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
+                f"Tick {game.get_tick_index()} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
             )
 
-    game.cleanup()
-    logger.info("Game thread exiting...\n")
+        # If all players are dead, restart the game
+        if game.all_players_dead():
+            logger.info(
+                f"All players are dead at tick {game.get_tick_index()}, restarting game...\n"
+            )
+            server.broadcast_game_restart()
+            game.restart_game()
+            await server.wait_start_game_timer(3)
+            tick_times = collections.deque(maxlen=100)
+            next_tick_time = time.perf_counter()
+
+    await server.stop()
+    logger.info("Game task exiting...\n")

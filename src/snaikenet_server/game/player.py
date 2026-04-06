@@ -107,7 +107,7 @@ class SnakePlayer:
             self._head.position[1] + self._next_direction.value[1],
         )
 
-    def kill(self):
+    def die(self):
         self._is_alive = False
 
     def is_dead(self) -> bool:

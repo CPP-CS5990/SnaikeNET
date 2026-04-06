@@ -56,6 +56,9 @@ class Grid:
     def food_at(self, position: Position) -> bool:
         return self._grid[position[0]][position[1]].tile_type == TileType.FOOD
 
+    def has_player_at(self, position: Position) -> bool:
+        return len(self._grid[position[0]][position[1]].player_ids) > 0
+
     def place_food_at(self, position: Position):
         self._grid[position[0]][position[1]].make_food()
         self._num_food_tiles += 1

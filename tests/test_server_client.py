@@ -130,9 +130,21 @@ async def test_server_broadcast():
     print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
 
     class _TestBroadcastEventHandler(SnaikenetClientEventHandler):
+        def on_game_about_to_start(self, seconds_until_start: int):
+            pass
+
+        def on_game_end(self):
+            pass
+
+        def on_game_restart(self):
+            pass
+
+        def on_game_start(self, viewport_size: tuple[int, int]):
+            pass
+
         _received_broadcast_future: asyncio.Future[ClientGameStateFrame]
 
-        def on_receive_game_state_frame(self, frame: ClientGameStateFrame):
+        def on_game_state_update(self, frame: ClientGameStateFrame):
             if self._received_broadcast_future.done():
                 return
             self._received_broadcast_future.set_result(frame)

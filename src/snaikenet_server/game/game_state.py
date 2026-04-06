@@ -1,3 +1,4 @@
+import random
 import uuid
 
 import numpy as np
@@ -9,66 +10,60 @@ from snaikenet_server.game.types import PlayerID, GridSize, Position, Direction
 
 
 class GameState:
-    _players: dict[PlayerID, SnakePlayer] = {}
-    _kills: dict[PlayerID, PlayerID] = {}
-    _dead_players: set[PlayerID] = set()
-    _living_players: set[PlayerID] = set()
-    _grid: Grid
-    _max_num_food: int = 1
-    _viewport_distance_from_center: tuple[int, int]
-
     def __init__(
         self,
         grid_size: GridSize,
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
-        self._grid = Grid(grid_size)
-        self._viewport_distance_from_center = viewport_distance_from_center
+        self._dead_players: set[PlayerID] = set()
+        self._players: dict[PlayerID, SnakePlayer] = {}
+        self._kills: dict[PlayerID, PlayerID] = {}
+        self._grid: Grid = Grid(grid_size)
+        self._viewport_distance_from_center: tuple[int, int] = (
+            viewport_distance_from_center
+        )
+        self._spectators: dict[PlayerID, PlayerID] = {}
+        self._max_num_food: int = 1
 
-    def restart_game(self):
-        self._grid = Grid(self._grid.get_grid_size())
-        old_players = list(self._players.keys())
-        self._players.clear()
-        self._living_players.clear()
-        self._dead_players.clear()
-        self._kills.clear()
-        for old_player_id in old_players:
-            self.add_new_player(old_player_id)
-        self.initialize_game_state()
+    def get_viewport_distance_from_center(self) -> tuple[int, int]:
+        return self._viewport_distance_from_center
 
     def kill_player(self, player_id: PlayerID, killer: PlayerID | None = None):
-        if killer is None:
-            killer = player_id
-        player = self._players[player_id]
-        if player:
-            self._kills[player_id] = killer
-            player.kill()
+        player = self._players.get(player_id, None)
+        if player is not None:
+            if killer is None:
+                self._kills[player_id] = player_id
+            else:
+                self._kills[player_id] = killer
+            player.die()
             self._dead_players.add(player_id)
-            self._living_players.remove(player_id)
             for position in player:
                 self._grid.remove_player_at(
                     position, player_id
                 )  # Mark all tiles occupied by the player as empty on the grid
-                self._grid.place_food_at(
-                    position
-                )  # Place food on all tiles occupied by the player
+
+                # After removing the player from the grid, we place food at positions that don't have another player.
+                # This ensures that food doesn't spawn on top of a player that just killed this player where the players intersected
+                if not self._grid.has_player_at(position):
+                    self._grid.place_food_at(position)
         else:
             logger.warning("Tried killing player that doesn't exist", player_id)
 
     # Adds a new player to the game state
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         if player_id is None:
-            player_id = str(uuid.uuid4())
-        self._players[player_id] = SnakePlayer(
+            player_id_ = str(uuid.uuid4())
+        else:
+            player_id_ = player_id
+        self._players[player_id_] = SnakePlayer(
             (0, 0),  # Temporary position, will be set properly in initialize_game_state
-            player_id,
+            player_id_,
         )
-        self._living_players.add(player_id)
-        return player_id
+        return player_id_
 
     def set_player_direction(self, player_id: PlayerID, player_direction: Direction):
-        player = self._players[player_id]
-        if player:
+        player = self._players.get(player_id, None)
+        if player is not None:
             player.set_direction(player_direction)
 
     def get_player(self, player_id: PlayerID) -> SnakePlayer | None:
@@ -78,7 +73,7 @@ class GameState:
         return set(self._dead_players)
 
     def get_living_players(self) -> set[PlayerID]:
-        return set(self._living_players)
+        return set(self._players.keys() - self._dead_players)
 
     def delete_player(self, player_id: PlayerID) -> bool:
         if player_id not in self._players:
@@ -88,7 +83,9 @@ class GameState:
             self._grid.remove_player_at(
                 tail_position, player_id
             )  # Mark the old tail position as empty on the grid
-        del self._players[player_id]
+        self._players.pop(player_id)
+        self._spectators.pop(player_id)
+        self._dead_players.remove(player_id)
         return True
 
     def position_outside_grid(self, position: Position) -> bool:
@@ -191,7 +188,7 @@ class GameState:
 
     def _initialize_food_positions(self):
         self._grid.fill_available_food_positions()
-        self._max_num_food = max(1, len(self._players) * 3)
+        self._max_num_food = max(1, len(self._players) * 5)
         for _ in range(self._max_num_food):
             food_position = self._grid.get_random_available_food_position()
             if food_position is not None:
@@ -250,27 +247,36 @@ class GameState:
             self._players[player_id] = SnakePlayer((x, y), player_id)
             self._grid.add_player_at((x, y), player_id)
 
-    def get_player_viewport(self, player_id: PlayerID) -> GridStructure:
+    def get_player_viewport(self, player: SnakePlayer) -> GridStructure:
         return self._grid.get_viewport(
-            self._players.get(player_id).get_head_position(),
+            player.get_head_position(),
             self._viewport_distance_from_center,
         )
 
-    def get_player_viewports(self):
-        return {
-            player_id: self._grid.get_viewport(
-                self._players.get(player_id).get_head_position(),
-                self._viewport_distance_from_center,
-            )
-            for player_id in self._players
-        }
-
     def get_player_states(self) -> dict[PlayerID, PlayerView]:
-        return {
-            player_id: self.get_player_state(player_id) for player_id in self._players
-        }
+        states: dict[PlayerID, PlayerView] = {}
+        living_players = list(self.get_living_players())
 
-    def get_player_state(self, player_id: PlayerID) -> PlayerView | None:
+        for player_id in living_players:
+            player_state = self.create_player_state(player_id)
+            if player_state is not None:
+                states[player_id] = player_state
+
+        for player_id in self._dead_players:
+            if len(living_players) > 0:
+                spectatee = self._spectators.get(player_id, None)
+                if spectatee is None or spectatee not in living_players:
+                    spectatee = random.choice(living_players)
+                    self._spectators[player_id] = spectatee
+                player_state = self.create_player_state(spectatee, is_spectating=True)
+                if player_state is not None:
+                    states[player_id] = player_state
+
+        return states
+
+    def create_player_state(
+        self, player_id: PlayerID, is_spectating: bool = False
+    ) -> PlayerView | None:
         player = self._players.get(player_id)
         if player is None:
             return None
@@ -282,9 +288,15 @@ class GameState:
             ),
             length=len(player),
             kills=sum(1 for killer in self._kills.values() if killer == player_id),
-            is_alive=not player.is_dead(),
-            viewport=self.get_player_viewport(player_id),
+            is_alive=is_spectating or not player.is_dead(),
+            viewport=self.get_player_viewport(player),
         )
+
+    def get_all_players(self):
+        return set(self._players.keys())
+
+    def all_players_dead(self):
+        return len(self._dead_players) == len(self._players)
 
 
 class PlayerView:

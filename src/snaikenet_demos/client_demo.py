@@ -23,7 +23,19 @@ async def main():
     setup_logger(verbose=args.verbose)
 
     class _MyClientEventHandler(SnaikenetClientEventHandler):
-        def on_receive_game_state_frame(self, frame: ClientGameStateFrame):
+        def on_game_about_to_start(self, seconds_until_start: int):
+            pass
+
+        def on_game_end(self):
+            pass
+
+        def on_game_restart(self):
+            pass
+
+        def on_game_start(self, viewport_size: tuple[int, int]):
+            pass
+
+        def on_game_state_update(self, frame: ClientGameStateFrame):
             logger.debug(f"Received game state frame: {frame}")
 
     client = SnaikenetClient(

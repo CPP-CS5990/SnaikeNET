@@ -7,6 +7,9 @@ class ArgNamespace(argparse.Namespace):
     tcp_port: int
     udp_port: int
     host: str
+    grid_size: tuple[int, int]
+    viewport_distance: tuple[int, int]
+    tick_rate: int
 
 
 def parse_args() -> ArgNamespace:
@@ -41,5 +44,29 @@ def parse_args() -> ArgNamespace:
         default="localhost",
         help="Host/IP address to bind the server to (default: localhost)",
     )
+    parser.add_argument(
+        "--grid-size",
+        type=int,
+        nargs=2,
+        default=(64, 64),
+        metavar=("W", "H"),
+        help="Grid dimensions as W H (default: 64 64)",
+    )
+    parser.add_argument(
+        "--viewport-distance",
+        type=int,
+        nargs=2,
+        default=(20, 20),
+        metavar=("X", "Y"),
+        help="Viewport distance from center as X Y (default: 20 20)",
+    )
+    parser.add_argument(
+        "--tick-rate",
+        type=int,
+        default=6,
+        help="Game tick rate in ticks per second (default: 6)",
+    )
     args = parser.parse_args(namespace=ArgNamespace())
+    args.grid_size = tuple(args.grid_size)
+    args.viewport_distance = tuple(args.viewport_distance)
     return args

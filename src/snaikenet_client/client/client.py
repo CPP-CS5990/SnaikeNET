@@ -8,7 +8,7 @@ from snaikenet_client.client.client_event_handler import (
     DefaultSnaikenetClientEventHandler,
 )
 from snaikenet_client.types import ClientDirection
-from snaikenet_protocol import protocol
+from snaikenet_protocol.protocol import ClientCodec, UdpMsgType
 
 
 class SnaikenetClient:
@@ -16,10 +16,10 @@ class SnaikenetClient:
     _udp_transport: asyncio.DatagramTransport
     _server_host: str
     _server_tcp_port: int
-    _server_udp_port: int | None = None
-    _client_uuid: str | None = None
-    _direction: ClientDirection | None = None
-    _send_task: asyncio.Task | None = None
+    _server_udp_port: int | None
+    _client_uuid: str | None
+    _direction: ClientDirection | None
+    _send_task: asyncio.Task | None
     _event_handler: SnaikenetClientEventHandler
 
     def __init__(
@@ -27,8 +27,7 @@ class SnaikenetClient:
         server_tcp_port: int = 8888,
         server_host: str = "localhost",
         send_interval_ms: int = 50,
-        event_handler: SnaikenetClientEventHandler
-        | None = DefaultSnaikenetClientEventHandler(),
+        event_handler: SnaikenetClientEventHandler = DefaultSnaikenetClientEventHandler(),
     ):
         self._send_interval = send_interval_ms / 1000.0
         self._server_host = server_host
@@ -57,16 +56,13 @@ class SnaikenetClient:
         logger.debug(
             f"Sending registration message to server at {self._server_host}:{self._server_tcp_port}"
         )
-        writer.write(self._new_connection_initial_tcp())
+        writer.write(ClientCodec.new_connection_initial_tcp_message())
         await writer.drain()
 
         response = await asyncio.wait_for(reader.read(500), timeout=5.0)
         response_json = json.loads(response.decode("utf-8").strip())
 
         if response_json.get("status") != "ok":
-            logger.error(
-                f"Failed to connect to server: {response_json.get('error', 'Unknown error')}"
-            )
             raise ConnectionError(
                 f"Failed to connect to server: {response_json.get('error', 'Unknown error')}"
             )
@@ -76,7 +72,6 @@ class SnaikenetClient:
             self._client_uuid = uuid
             logger.info(f"Server responded with UUID {uuid}")
         else:
-            logger.error("Failed to connect to server: No UUID received")
             raise ConnectionError("Failed to connect to server: No UUID received")
 
         udp_port = response_json.get("udp_port")
@@ -98,14 +93,14 @@ class SnaikenetClient:
 
         # UDP hole punching:
         logger.debug(
-            f"Sending UDP hole-punching datagram to server at {self._server_host}:{self._server_udp_port} with UUID {self._client_uuid}"
+            f"Sending UDP hole-punching datagram to server at {self._server_host}:{self._server_udp_port} with UUID {uuid}"
         )
         for _ in range(
             5
         ):  # Send multiple times to increase chances of successful hole punching
             await asyncio.sleep(0.1)
             self._udp_transport.sendto(
-                self._to_json({"type": "hole_punch", "uuid": self._client_uuid})
+                ClientCodec.hole_punch_udp_message(uuid),
             )
 
         logger.debug(
@@ -144,20 +139,13 @@ class SnaikenetClient:
         logger.debug(
             f"Sending direction {self._direction} to server at {self._server_host}:{self._server_udp_port} via UDP"
         )
-        self._udp_transport.sendto(protocol.encode_direction(self._direction))
+        self._udp_transport.sendto(ClientCodec.encode_direction(self._direction))
 
     def set_direction(self, direction: ClientDirection):
         self._direction = direction
 
     def get_client_id(self) -> str | None:
         return self._client_uuid
-
-    @staticmethod
-    def _to_json(data: dict) -> bytes:
-        return json.dumps(data).encode() + b"\n"
-
-    def _new_connection_initial_tcp(self):
-        return self._to_json({"type": "new"})
 
     class _UdpProtocol(asyncio.DatagramProtocol):
         def __init__(self, client: "SnaikenetClient"):
@@ -174,9 +162,24 @@ class SnaikenetClient:
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
             logger.debug(f"Received UDP message from {addr}: {data.hex()}")
             try:
-                self._client._event_handler.on_receive_game_state_frame(
-                    protocol.decode_player_game_state(data)
-                )
+                match UdpMsgType.peek_msg_type(data):
+                    case UdpMsgType.GAME_START:
+                        self._client._event_handler.on_game_start(
+                            ClientCodec.decode_game_start(data)
+                        )
+                    case UdpMsgType.GAME_RESTART:
+                        self._client._event_handler.on_game_restart()
+                    case UdpMsgType.GAME_STATE_FRAME_UPDATE:
+                        self._client._event_handler.on_game_state_update(
+                            ClientCodec.decode_player_game_state(data)
+                        )
+                    case UdpMsgType.GAME_ABOUT_TO_START:
+                        self._client._event_handler.on_game_about_to_start(
+                            ClientCodec.decode_game_about_to_start(data)
+                        )
+                    case UdpMsgType.GAME_END:
+                        self._client._event_handler.on_game_end()
+
             except ValueError as _:
                 logger.error(
                     f"Failed to decode game state frame from server: {data.hex()}"

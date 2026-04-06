@@ -36,7 +36,6 @@ def test__game_state_player_initialization():
 
 
 def test__game_state_move_players():
-    logger.info("Testing game state player movement...\n")
     grid_size = (101, 80)
     game_state = GameState(grid_size)
 
@@ -44,7 +43,6 @@ def test__game_state_move_players():
 
     for i in range(5):
         player_uids.append(game_state.add_new_player())
-        logger.info(f"Player {i} ID: {player_uids[i]}")
 
     game_state._initialize_player_positions()
 
@@ -99,7 +97,6 @@ def test__game_state_move_players():
 
 
 def test__game_state_move_players_eat_food():
-    logger.info("Testing game state player movement...\n")
     grid_size = (101, 80)
     game_state = GameState(grid_size)
 
@@ -107,7 +104,6 @@ def test__game_state_move_players_eat_food():
 
     for i in range(5):
         player_uids.append(game_state.add_new_player())
-        logger.info(f"Player {i} ID: {player_uids[i]}")
 
     game_state._initialize_player_positions()
 

@@ -52,9 +52,6 @@ from snaikenet_server.server_commands import (
 )
 import asyncio
 
-TICK_RATE = 6
-TICK_INTERVAL = 1 / TICK_RATE
-
 
 def setup_logger(verbose: bool):
     logger.remove()
@@ -69,7 +66,8 @@ async def main():
     args = parse_args()
     setup_logger(args.verbose)
 
-    game = Game((64, 64), viewport_distance_from_center=(20, 20))
+    tick_interval = 1 / args.tick_rate
+    game = Game(args.grid_size, viewport_distance_from_center=args.viewport_distance)
 
     def stop_server():
         game.stop_game()
@@ -86,7 +84,7 @@ async def main():
         asyncio.create_task(
             game_loop(
                 game,
-                TICK_INTERVAL,
+                tick_interval,
                 host=args.host,
                 tcp_port=args.tcp_port,
                 udp_port=args.udp_port,
