@@ -294,7 +294,10 @@ class SnaikenetServer:
             )
 
     async def wait_start_game_timer(self, seconds_until_start: int):
-        for i in range(seconds_until_start, 0, -1):
-            logger.info(f"Game starting in {i}...\n")
-            self.broadcast_game_about_to_start(i)
-            await asyncio.sleep(1)
+        for seconds in range(seconds_until_start, 0, -1):
+            logger.info(f"Game starting in {seconds} seconds...\n")
+            # Broadcast the "game about to start" message multiple
+            # times to increase chance of delivery to clients since UDP is unreliable
+            for _ in range(10):
+                self.broadcast_game_about_to_start(seconds)
+                await asyncio.sleep(0.1)
