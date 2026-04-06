@@ -98,7 +98,6 @@ class QueueClientEventHandler(SnaikenetClientEventHandler):
         self._reset_current_sequence_number()
 
     def on_game_about_to_start(self, seconds_until_start: int):
-        logger.info(f"Game starting in {seconds_until_start}s")
         self.event_queue.put(
             ClientEvent(kind="countdown", seconds_until_start=seconds_until_start)
         )
