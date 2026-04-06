@@ -74,6 +74,8 @@ class QueueClientEventHandler(SnaikenetClientEventHandler):
 
     def __init__(self):
         self.event_queue: queue.Queue[ClientEvent] = queue.Queue()
+        self._curr_sequence_number: int = -1
+        self._reset_current_sequence_number()
 
     def on_game_state_update(self, frame: ClientGameStateFrame):
         logger.debug(
@@ -81,26 +83,36 @@ class QueueClientEventHandler(SnaikenetClientEventHandler):
             f"length={frame.player_length}, kills={frame.num_kills}, alive={frame.is_alive}"
         )
         self.event_queue.put(ClientEvent(kind="frame", frame=frame))
+        if self._curr_sequence_number + 1 != frame.sequence_number:
+            logger.warning(f"Out of order sequence numbers: {frame.sequence_number}")
+        self._curr_sequence_number = frame.sequence_number
+
+    def _reset_current_sequence_number(self):
+        self._curr_sequence_number = -1
 
     def on_game_start(self, viewport_size: tuple[int, int]):
         logger.info(f"Game starting with viewport size {viewport_size}")
         self.event_queue.put(
             ClientEvent(kind="game_start", viewport_size=viewport_size)
         )
+        self._reset_current_sequence_number()
 
     def on_game_about_to_start(self, seconds_until_start: int):
         logger.info(f"Game starting in {seconds_until_start}s")
         self.event_queue.put(
             ClientEvent(kind="countdown", seconds_until_start=seconds_until_start)
         )
+        self._reset_current_sequence_number()
 
     def on_game_end(self):
         logger.info("Game ended")
         self.event_queue.put(ClientEvent(kind="game_end"))
+        self._reset_current_sequence_number()
 
     def on_game_restart(self):
         logger.info("Game restarting")
         self.event_queue.put(ClientEvent(kind="game_restart"))
+        self._reset_current_sequence_number()
 
 
 def compute_tile_size(viewport_w: int, viewport_h: int) -> int:
@@ -203,13 +215,14 @@ async def run_client(
     direction_queue: queue.Queue[ClientDirection],
     server_host: str = "localhost",
     server_tcp_port: int = 8888,
+    client_uuid: str | None = None,
 ):
     client = SnaikenetClient(
         server_host=server_host,
         server_tcp_port=server_tcp_port,
         event_handler=handler,
     )
-    await client.start()
+    await client.start(client_uuid)
     logger.info("Client connected to server")
     client.set_direction(ClientDirection.NORTH)
 
@@ -230,6 +243,7 @@ def start_network_thread(
     direction_queue: queue.Queue[ClientDirection],
     server_host: str = "localhost",
     server_tcp_port: int = 8888,
+    client_uuid: str | None = None,
 ):
     """Run asyncio with SelectorEventLoop in its own thread to avoid
     Windows ProactorEventLoop UDP issues and any pygame interference."""
@@ -237,7 +251,7 @@ def start_network_thread(
     loop = asyncio.SelectorEventLoop(selector)
     asyncio.set_event_loop(loop)
     loop.run_until_complete(
-        run_client(handler, direction_queue, server_host, server_tcp_port)
+        run_client(handler, direction_queue, server_host, server_tcp_port, client_uuid)
     )
 
 
@@ -251,7 +265,7 @@ def main():
     # Network runs in a background thread with its own SelectorEventLoop
     net_thread = threading.Thread(
         target=start_network_thread,
-        args=(handler, direction_queue, args.host, args.port),
+        args=(handler, direction_queue, args.host, args.port, args.reconnect_uuid),
         daemon=True,
     )
     net_thread.start()

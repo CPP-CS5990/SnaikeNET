@@ -34,18 +34,18 @@ class SnaikenetClient:
         self._server_tcp_port = server_tcp_port
         self._event_handler = event_handler
 
-    async def start(self):
+    async def start(self, uuid: str | None = None) -> None:
         loop = asyncio.get_running_loop()
         # Attempt to connect to server until successful
         while not hasattr(self, "_udp_transport") or self._udp_transport.is_closing():
             try:
-                await self.connect()
+                await self.connect(uuid)
             except ConnectionError as e:
                 logger.error(f"Failed to connect to server: {e}")
 
         self._send_task = loop.create_task(self._send_direction_loop())
 
-    async def connect(self):
+    async def connect(self, uuid: str | None = None) -> None:
         # TCP Registration:
         logger.debug(
             f"Attempting to connect to server at {self._server_host}:{self._server_tcp_port} via TCP for registration"
@@ -56,7 +56,11 @@ class SnaikenetClient:
         logger.debug(
             f"Sending registration message to server at {self._server_host}:{self._server_tcp_port}"
         )
-        writer.write(ClientCodec.new_connection_initial_tcp_message())
+        if uuid is None:
+            writer.write(ClientCodec.new_connection_initial_tcp_message())
+        else:
+            writer.write(ClientCodec.reconnect_initial_tcp_message(uuid))
+
         await writer.drain()
 
         response = await asyncio.wait_for(reader.read(500), timeout=5.0)
@@ -143,6 +147,7 @@ class SnaikenetClient:
 
     def set_direction(self, direction: ClientDirection):
         self._direction = direction
+        self._send_direction()
 
     def get_client_id(self) -> str | None:
         return self._client_uuid

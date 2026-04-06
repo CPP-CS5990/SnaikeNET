@@ -5,6 +5,7 @@ class ClientArgNamespace(argparse.Namespace):
     host: str
     port: int
     verbose: bool
+    reconnect_uuid: str
 
 
 def parse_client_args() -> ClientArgNamespace:
@@ -26,6 +27,12 @@ def parse_client_args() -> ClientArgNamespace:
         "-v",
         action="store_true",
         help="Enable verbose logging for debugging purposes.",
+    )
+    parser.add_argument(
+        "--reconnect-uuid",
+        type=str,
+        default=None,
+        help="UUID to reconnect to the server (default: None)",
     )
     args = parser.parse_args(namespace=ClientArgNamespace())
     return args

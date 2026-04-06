@@ -250,6 +250,10 @@ class ClientCodec:
         return _to_json({"type": "new"})
 
     @staticmethod
+    def reconnect_initial_tcp_message(uuid: str):
+        return _to_json({"type": "reconnect", "uuid": uuid})
+
+    @staticmethod
     def hole_punch_udp_message(client_uuid: str):
         return _to_json({"type": "hole_punch", "uuid": client_uuid})
 
