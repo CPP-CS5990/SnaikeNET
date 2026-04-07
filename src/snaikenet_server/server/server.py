@@ -29,31 +29,25 @@ class SnaikenetServer:
         4) Server: updates client's NAT-mapped addr for future communication
     """
 
-    _host: str
-    _tcp_port: int
-    _udp_port: int
-    _connected_clients: ConnectedClients
-    # Temporary storage for pending hole-punching requests: UUID -> Future that will be set with (host, port) when UDP datagram is received
-    _pending_clients: dict[str, asyncio.Future[tuple[str, int]]]
-    _keep_accepting_new_clients: bool
-    _udp_transport: asyncio.DatagramTransport
-    _tcp_server: asyncio.Server
-    _event_handler: SnaikenetServerEventHandler
-
     def __init__(
         self,
         host="localhost",
         tcp_port=8888,
         udp_port=8888,
         event_handler: SnaikenetServerEventHandler = DefaultSnaikenetServerEventHandler(),
+        client_timeout_seconds: float = 20,
     ):
-        self._host = host
-        self._tcp_port = tcp_port
-        self._udp_port = udp_port
-        self._connected_clients = ConnectedClients()
-        self._keep_accepting_new_clients = True
-        self._pending_clients = {}
-        self._event_handler = event_handler
+        self._host: str = host
+        self._tcp_port: int = tcp_port
+        self._udp_port: int = udp_port
+        self._connected_clients: ConnectedClients = ConnectedClients()
+        # Temporary storage for pending hole-punching requests: UUID -> Future that will be set with (host, port) when UDP datagram is received
+        self._pending_clients: dict[str, asyncio.Future[tuple[str, int]]] = {}
+        self._event_handler: SnaikenetServerEventHandler = event_handler
+        self._tcp_server: asyncio.Server | None = None
+        self._udp_transport: asyncio.DatagramTransport | None = None
+        self._clean_idle_clients_task = None
+        self._client_timeout_seconds = client_timeout_seconds
 
     def get_host(self) -> str:
         return self._host
@@ -64,20 +58,27 @@ class SnaikenetServer:
     def get_udp_port(self) -> int:
         return self._udp_port
 
-    def set_keep_accepting_new_clients(self, keep_accepting_new_clients: bool):
-        self._keep_accepting_new_clients = keep_accepting_new_clients
-
     def broadcast_game_start(self, viewport_size: tuple[int, int]):
+        if self._udp_transport is None:
+            self._log_udp_not_initialized()
+            return
         for dest in self._connected_clients.get_client_addrs():
             self._udp_transport.sendto(
                 ServerCodec.encode_game_start(viewport_size), dest
             )
 
     def broadcast_game_restart(self):
+        if self._udp_transport is None:
+            self._log_udp_not_initialized()
+            return
         for dest in self._connected_clients.get_client_addrs():
             self._udp_transport.sendto(ServerCodec.encode_game_restart(), dest)
 
     def broadcast_game_end(self):
+        logger.info("Broadcasting game end...")
+        if self._udp_transport is None:
+            self._log_udp_not_initialized()
+            return
         for dest in self._connected_clients.get_client_addrs():
             self._udp_transport.sendto(ServerCodec.encode_game_end(), dest)
 
@@ -90,6 +91,9 @@ class SnaikenetServer:
     def _broadcast_game_state_frame(
         self, client_id: str, client_frame: PlayerView, sequence_number: int
     ):
+        if self._udp_transport is None:
+            self._log_udp_not_initialized()
+            return
         dest = self._connected_clients.get_client_by_id(client_id)
         if dest is not None:
             self._udp_transport.sendto(
@@ -99,20 +103,28 @@ class SnaikenetServer:
                 dest.get_addr(),
             )
 
-    async def start(self):
+    @staticmethod
+    def _log_udp_not_initialized():
+        logger.error(f"UDP transport not initialized. Make sure start method is called")
+
+    async def start(self, clean_idle_clients: bool = True):
         loop = asyncio.get_running_loop()
 
-        self._tcp_server = await asyncio.start_server(
+        self._tcp_server = _tcp_server = await asyncio.start_server(
             self._handle_registration, self._host, self._tcp_port
         )
-        self._tcp_port = self._tcp_server.sockets[0].getsockname()[1]
+        self._tcp_port = _tcp_server.sockets[0].getsockname()[1]
         logger.info(f"TCP server started on {self._host}:{self._tcp_port}")
 
         await loop.create_datagram_endpoint(
             lambda: self._UdpProtocol(self), local_addr=(self._host, self._udp_port)
         )
+        # noinspection PyUnresolvedReferences
         self._udp_port = self._udp_transport.get_extra_info("socket").getsockname()[1]
         logger.info(f"UDP server started on {self._host}:{self._udp_port}")
+
+        if clean_idle_clients:
+            self._clean_idle_clients_task = loop.create_task(self._clean_idle_clients_loop())
 
     def get_clients_str(self) -> str:
         return "Clients connected: " + ", ".join(
@@ -123,7 +135,7 @@ class SnaikenetServer:
     def get_client_ids(self) -> list[str]:
         return [client.get_id() for client in self._connected_clients.get_clients()]
 
-    async def server_forever(self):
+    async def serve_forever(self):
         if self._tcp_server is None:
             raise RuntimeError("Server not started yet")
         async with self._tcp_server:
@@ -131,6 +143,9 @@ class SnaikenetServer:
 
     async def stop(self):
         self.broadcast_game_end()
+        if self._clean_idle_clients_task:
+            logger.info("Stopping clean idle clients task...")
+            self._clean_idle_clients_task.cancel()
         if self._udp_transport:
             logger.info("Stopping UDP server...")
             self._udp_transport.close()
@@ -138,7 +153,7 @@ class SnaikenetServer:
             logger.info("Stopping TCP server...")
             self._tcp_server.close()
             await self._tcp_server.wait_closed()
-        logger.info("Snaikenet server stopped.")
+        logger.info("SnaikeNET server stopped.")
 
     async def _handle_registration(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -160,14 +175,8 @@ class SnaikenetServer:
 
             match req_type:
                 case "new":
-                    if not self._keep_accepting_new_clients:
-                        writer.write(
-                            ServerCodec.error_response("Not accepting new clients")
-                        )
-                        await writer.drain()
-                        return
                     client_id = str(uuid4())
-                    self._connected_clients.pop_client_by_id(
+                    self._connected_clients.remove_client_by_id(
                         client_id
                     )  # Clear any old registration with same UUID just in case, should be very unlikely
                     logger.debug(
@@ -182,7 +191,7 @@ class SnaikenetServer:
                         await writer.drain()
                         return
 
-                    self._connected_clients.pop_client_by_id(client_id)
+                    self._connected_clients.remove_client_by_id(client_id)
                     logger.info(
                         f"Client with UUID {client_id} is reconnecting from {peer}"
                     )
@@ -213,7 +222,7 @@ class SnaikenetServer:
                     await pending_client
 
                 if req_type == "new":
-                    self._connected_clients.pop_client_by_id(
+                    self._connected_clients.remove_client_by_id(
                         client_id
                     )  # Clear any registration for this client since hole punch failed
                 logger.warning(f"Hole punch timed out for client {client_id}")
@@ -224,7 +233,10 @@ class SnaikenetServer:
             # At this point, we have already handled if this is a reconnect and cleared the old address, so we can just register the new address
             self._connected_clients.register_client(client_id, external_addr)
             if req_type == "new":
-                self._event_handler.on_new_client_connect(client_id)
+                is_spectator: bool = msg.get("spectator")
+                if not isinstance(is_spectator, bool):
+                    is_spectator = False
+                self._event_handler.on_new_client_connect(client_id, is_spectator)
 
             logger.info(
                 f"Client {client_id} hole-punched successfully with external address {external_addr}. Sending registration success response to TCP {peer}"
@@ -285,8 +297,13 @@ class SnaikenetServer:
                     )
                 except ValueError as e:
                     logger.debug(e)
+            elif msg_type == "heartbeat":
+                self._server._connected_clients.touch_client_by_addr(addr)
 
     def broadcast_game_about_to_start(self, seconds_until_start: int):
+        if self._udp_transport is None:
+            self._log_udp_not_initialized()
+            return
         for client in self._connected_clients.get_clients():
             dest = client.get_addr()
             self._udp_transport.sendto(
@@ -301,3 +318,20 @@ class SnaikenetServer:
             for _ in range(10):
                 self.broadcast_game_about_to_start(seconds)
                 await asyncio.sleep(0.1)
+
+    async def _clean_idle_clients_loop(self):
+        while True:
+            await asyncio.sleep(1)
+            current_time = asyncio.get_running_loop().time()
+            clients_to_remove = []
+            for client in self._connected_clients.get_clients():
+                if current_time - client.get_last_seen()  > self._client_timeout_seconds:
+                    clients_to_remove.append(client)
+            for client in clients_to_remove:
+                addr = client.get_addr()
+                client_id = client.get_id()
+                if self._udp_transport is not None:
+                    self._udp_transport.sendto(ServerCodec.encode_game_end(), addr)
+                self._event_handler.on_client_disconnect(client_id)
+                self._connected_clients.remove_client_by_id(client_id)
+

@@ -19,20 +19,24 @@ class SnaikenetClient:
     _server_udp_port: int | None
     _client_uuid: str | None
     _direction: ClientDirection | None
-    _send_task: asyncio.Task | None
+    _send_direction_task: asyncio.Task | None
     _event_handler: SnaikenetClientEventHandler
 
     def __init__(
         self,
         server_tcp_port: int = 8888,
         server_host: str = "localhost",
-        send_interval_ms: int = 50,
+        send_interval_ms: int = 13,
         event_handler: SnaikenetClientEventHandler = DefaultSnaikenetClientEventHandler(),
+        is_spectator: bool = False,
     ):
         self._send_interval = send_interval_ms / 1000.0
         self._server_host = server_host
         self._server_tcp_port = server_tcp_port
         self._event_handler = event_handler
+        self._is_spectator = is_spectator
+        self._send_direction_task = None
+        self._heartbeat_task = None
 
     async def start(self, uuid: str | None = None) -> None:
         loop = asyncio.get_running_loop()
@@ -43,7 +47,9 @@ class SnaikenetClient:
             except ConnectionError as e:
                 logger.error(f"Failed to connect to server: {e}")
 
-        self._send_task = loop.create_task(self._send_direction_loop())
+        if not self._is_spectator:
+            self._send_direction_task = loop.create_task(self._send_direction_loop())
+        self._heartbeat_task = loop.create_task(self._send_heartbeat_loop())
 
     async def connect(self, uuid: str | None = None) -> None:
         # TCP Registration:
@@ -57,7 +63,7 @@ class SnaikenetClient:
             f"Sending registration message to server at {self._server_host}:{self._server_tcp_port}"
         )
         if uuid is None:
-            writer.write(ClientCodec.new_connection_initial_tcp_message())
+            writer.write(ClientCodec.new_connection_initial_tcp_message(self._is_spectator))
         else:
             writer.write(ClientCodec.reconnect_initial_tcp_message(uuid))
 
@@ -134,6 +140,19 @@ class SnaikenetClient:
         except asyncio.CancelledError:
             logger.info("Direction send loop cancelled")
 
+    async def _send_heartbeat_loop(self):
+        try:
+            while True:
+                await asyncio.sleep(1)
+                self._send_heartbeat()
+        except asyncio.CancelledError:
+            logger.info("Direction send loop cancelled")
+
+    def _send_heartbeat(self):
+        if self._udp_transport.is_closing():
+            return
+        self._udp_transport.sendto(ClientCodec.heartbeat_message())
+
     def _send_direction(self):
         if self._direction is None:
             return
@@ -192,7 +211,9 @@ class SnaikenetClient:
                 return
 
     async def stop(self):
-        if self._send_task:
-            self._send_task.cancel()
-        if hasattr(self, "_udp_transport"):
+        if self._send_direction_task:
+            self._send_direction_task.cancel()
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+        if self._udp_transport:
             self._udp_transport.close()

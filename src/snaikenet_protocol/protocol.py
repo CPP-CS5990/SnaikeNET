@@ -246,15 +246,15 @@ class ClientCodec:
         return seconds_until_start
 
     @staticmethod
-    def new_connection_initial_tcp_message():
-        return _to_json({"type": "new"})
+    def new_connection_initial_tcp_message(spectator: bool = False) -> bytes:
+        return _to_json({"type": "new", "spectator": spectator})
 
     @staticmethod
     def reconnect_initial_tcp_message(uuid: str):
         return _to_json({"type": "reconnect", "uuid": uuid})
 
     @staticmethod
-    def hole_punch_udp_message(client_uuid: str):
+    def hole_punch_udp_message(client_uuid: str) -> bytes:
         return _to_json({"type": "hole_punch", "uuid": client_uuid})
 
     @staticmethod
@@ -265,3 +265,7 @@ class ClientCodec:
                 "direction": direction.value,
             }
         )
+
+    @staticmethod
+    def heartbeat_message():
+        return _to_json({"type": "heartbeat"})

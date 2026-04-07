@@ -65,16 +65,17 @@ def setup_logger(verbose: bool):
 async def main():
     args = parse_args()
     setup_logger(args.verbose)
+    loop = asyncio.get_running_loop()
 
     tick_interval = 1 / args.tick_rate
-    game = Game(args.grid_size, viewport_distance_from_center=args.viewport_distance)
+    game = Game(loop, args.grid_size, viewport_distance_from_center=args.viewport_distance)
 
     def stop_server():
         game.stop_game()
         command_interface.set_stop_signal()
 
     command_interface = GameServerCommandInterface(
-        start_game=game.start_game,
+        start_game=game.set_start_event,
         stop_server=stop_server,
         restart_game=game.restart_game,
     )

@@ -19,7 +19,7 @@ async def test_client_tcp_registration():
     # Create and start server
     server = SnaikenetServer(tcp_port=0, udp_port=0)
     await server.start()
-    asyncio.create_task(server.server_forever())
+    asyncio.create_task(server.serve_forever())
     print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
 
     # Create and start client
@@ -58,7 +58,7 @@ async def test_client_send_and_receive_direction():
                 and self._received_client_id_future.done()
             )
 
-        def on_new_client_connect(self, client_id: str):
+        def on_new_client_connect(self, client_id: str, spectator: bool = False):
             pass
 
         def on_client_disconnect(self, client_id: str):
@@ -88,7 +88,7 @@ async def test_client_send_and_receive_direction():
     # Create and start server
     server = SnaikenetServer(event_handler=event_handler, tcp_port=0, udp_port=0)
     await server.start()
-    asyncio.create_task(server.server_forever())
+    asyncio.create_task(server.serve_forever())
     print(f"Server started at {server.get_host()}:{server.get_udp_port()}")
 
     # Create and start client
@@ -126,7 +126,7 @@ async def test_server_broadcast():
     # Create and start server
     server = SnaikenetServer(tcp_port=0, udp_port=0)
     await server.start()
-    asyncio.create_task(server.server_forever())
+    asyncio.create_task(server.serve_forever())
     print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
 
     class _TestBroadcastEventHandler(SnaikenetClientEventHandler):
