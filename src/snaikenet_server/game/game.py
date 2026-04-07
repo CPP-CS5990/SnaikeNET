@@ -49,14 +49,14 @@ class Game:
 
     def start_game(self):
         if not self._game_state.initialize_game_state():
-            logger.error("Failed to initialize game state, cannot start game loop.\n")
+            logger.error("Failed to initialize game state, cannot start game loop.")
             return False
         self._is_being_played = True
         return True
 
     # Threadsafe
     def stop_game(self):
-        logger.info("Stop event received, stopping game loop...\n")
+        logger.info("Stop event received, stopping game loop...")
         self.unset_start_event()
         self._threadsafe(self._stop_event.set)
 
@@ -78,7 +78,7 @@ class Game:
         return not self._stop_event.is_set()
 
     async def wait_for_game_start(self):
-        logger.debug("Waiting for start event...\n")
+        logger.debug("Waiting for start event...")
         # ensures that players will be able to join while we wait for the start event
         self._is_being_played = False
 
@@ -92,7 +92,7 @@ class Game:
 
         # Clear the start event so that if we need to restart the game, we can wait for it to be set again
         self._start_event.clear()
-        logger.info("Start signal received, starting game...\n")
+        logger.info("Start signal received, starting game...")
         return self.restart_game()
 
     def should_restart(self) -> bool:
@@ -109,7 +109,7 @@ class Game:
             self._flush_pending_players()
             self._tick_index = -1
 
-            logger.info("Starting new game...\n")
+            logger.info("Starting new game...")
             return self.start_game()
 
     def flush_pending_players(self):
@@ -118,7 +118,7 @@ class Game:
 
     def _flush_pending_players(self):
         for player_id in self._pending_players:
-            logger.info(f"Adding pending player {player_id}\n")
+            logger.info(f"Adding pending player {player_id}")
             self._add_new_player(player_id)
         self._pending_players.clear()
 
@@ -151,7 +151,7 @@ class Game:
                 self._pending_players.remove(player_id)
             else:
                 self._game_state.delete_player(player_id)
-            logger.info(f"Deleted player with ID: {player_id}\n")
+            logger.info(f"Deleted player with ID: {player_id}")
 
     def add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         with self._game_lock:
@@ -159,7 +159,7 @@ class Game:
 
     def _add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
         player_id_ = self._game_state.add_new_player(player_id)
-        logger.info(f"Added new player with ID: {player_id_}\n")
+        logger.info(f"Added new player with ID: {player_id_}")
         return player_id_
 
     def add_spectator(self, player_id: PlayerID):
@@ -219,7 +219,7 @@ async def game_loop(
     )
     await server.start(clean_idle_clients=clean_idle_clients)
 
-    logger.info("Game thread started, waiting for start signal...\n")
+    logger.info("Game thread started, waiting for start signal...")
     while game.is_running():
         # we want to flush the pending players into the game right before we wait for the game start signal
         game.flush_pending_players()
@@ -265,7 +265,7 @@ async def game_loop(
                 await server.wait_start_game_timer(1)
                 tick_times = collections.deque(maxlen=tick_times.maxlen)
                 next_tick_time = time.perf_counter()
-
+        logger.info(f"No more players left to play game. Waiting for start signal before starting again...")
     logger.info(f"Stopping network servers...")
     await server.stop()
-    logger.info("Game task exiting...\n")
+    logger.info("Game task exiting...")
