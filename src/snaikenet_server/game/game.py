@@ -199,7 +199,13 @@ class _GameEventHandler(SnaikenetServerEventHandler):
 
 
 async def game_loop(
-    game: Game, tick_interval: float, host: str, tcp_port: int, udp_port: int, clean_idle_clients: bool = True, client_timeout_seconds: float = 20
+    game: Game,
+    tick_interval: float,
+    host: str,
+    tcp_port: int,
+    udp_port: int,
+    clean_idle_clients: bool = True,
+    client_timeout_seconds: float = 20,
 ):
     server = SnaikenetServer(
         host=host,
