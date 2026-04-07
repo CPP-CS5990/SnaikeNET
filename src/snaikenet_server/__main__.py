@@ -91,6 +91,8 @@ async def main():
                 host=args.host,
                 tcp_port=args.tcp_port,
                 udp_port=args.udp_port,
+                clean_idle_clients=args.clean_idle_clients,
+                client_timeout_seconds=args.client_timeout,
             )
         ),
         asyncio.to_thread(console_loop, command_interface),

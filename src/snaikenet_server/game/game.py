@@ -199,15 +199,16 @@ class _GameEventHandler(SnaikenetServerEventHandler):
 
 
 async def game_loop(
-    game: Game, tick_interval: float, host: str, tcp_port: int, udp_port: int
+    game: Game, tick_interval: float, host: str, tcp_port: int, udp_port: int, clean_idle_clients: bool = True, client_timeout_seconds: float = 20
 ):
     server = SnaikenetServer(
         host=host,
         tcp_port=tcp_port,
         udp_port=udp_port,
         event_handler=_GameEventHandler(game),
+        client_timeout_seconds=client_timeout_seconds,
     )
-    await server.start()
+    await server.start(clean_idle_clients=clean_idle_clients)
 
     logger.info("Game thread started, waiting for start signal...\n")
     while game.is_running():
