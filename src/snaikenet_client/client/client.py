@@ -145,7 +145,7 @@ class SnaikenetClient:
     async def _send_heartbeat_loop(self):
         try:
             while True:
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.4)
                 self._send_heartbeat()
         except asyncio.CancelledError:
             logger.info("Heartbeat loop cancelled")
