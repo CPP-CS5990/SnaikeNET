@@ -106,18 +106,22 @@ class Game:
         with self._game_lock:
             self._game_state.reset_game_state()
 
-            for player_id in self._pending_players:
-                logger.info(f"Adding pending player {player_id}\n")
-                self._add_new_player(player_id)
+            self._flush_pending_players()
             self._tick_index = -1
 
             logger.info("Starting new game...\n")
             return self.start_game()
 
-    def add_pending_players(self):
+    def flush_pending_players(self):
         with self._game_lock:
-            for player_id in self._pending_players:
-                self._game_state.add_new_player(player_id)
+            self._flush_pending_players()
+
+    def _flush_pending_players(self):
+        for player_id in self._pending_players:
+            logger.info(f"Adding pending player {player_id}\n")
+            self._add_new_player(player_id)
+        self._pending_players.clear()
+
 
     def get_grid_iterator(self):
         return self._game_state.get_grid_iterator()
@@ -219,7 +223,7 @@ async def game_loop(
     logger.info("Game thread started, waiting for start signal...\n")
     while game.is_running():
         # we want to flush the pending players into the game right before we wait for the game start signal
-        game.add_pending_players()
+        game.flush_pending_players()
         if not await game.wait_for_game_start():
             continue
         # Once the game starts, stop accepting new clients
