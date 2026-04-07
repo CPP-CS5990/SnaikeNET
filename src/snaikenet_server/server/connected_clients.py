@@ -85,4 +85,3 @@ class ConnectedClients:
         client = self.get_client_by_addr(addr)
         if client is not None:
             client.touch()
-

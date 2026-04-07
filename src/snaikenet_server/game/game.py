@@ -122,7 +122,6 @@ class Game:
             self._add_new_player(player_id)
         self._pending_players.clear()
 
-
     def get_grid_iterator(self):
         return self._game_state.get_grid_iterator()
 
