@@ -13,7 +13,7 @@ def parse_client_args() -> ClientArgNamespace:
     parser = argparse.ArgumentParser(description="SnaikeNET Client")
     parser.add_argument(
         "--host",
-        "-h",
+        "-H",
         type=str,
         default="localhost",
         help="Server host to connect to (default: localhost)",
