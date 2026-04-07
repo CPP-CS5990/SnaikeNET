@@ -265,7 +265,9 @@ async def game_loop(
                 await server.wait_start_game_timer(1)
                 tick_times = collections.deque(maxlen=tick_times.maxlen)
                 next_tick_time = time.perf_counter()
-        logger.info(f"No more players left to play game. Waiting for start signal before starting again...")
+        logger.info(
+            f"No more players left to play game. Waiting for start signal before starting again..."
+        )
     logger.info(f"Stopping network servers...")
     await server.stop()
     logger.info("Game task exiting...")
