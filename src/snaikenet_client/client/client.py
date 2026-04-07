@@ -148,7 +148,7 @@ class SnaikenetClient:
                 await asyncio.sleep(1)
                 self._send_heartbeat()
         except asyncio.CancelledError:
-            logger.info("Direction send loop cancelled")
+            logger.info("Heartbeat loop cancelled")
 
     def _send_heartbeat(self):
         if self._udp_transport.is_closing():
