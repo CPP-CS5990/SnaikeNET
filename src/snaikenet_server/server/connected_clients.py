@@ -54,15 +54,21 @@ class ConnectedClients:
             return
         client = self._clients[index]
         self._addr_map.pop(client.get_addr(), None)
-        self._clients.pop(index)
-        self._defragment_clients()
-        return
+
+        last_index = len(self._clients) - 1
+        if index != last_index and index is not None:
+            # Swap removed client with the last client and update its indices
+            last_client = self._clients[last_index]
+            self._clients[index] = last_client
+            self._client_id_map[last_client.get_id()] = index
+            self._addr_map[last_client.get_addr()] = index
+        self._clients.pop()
 
     def get_client_addrs(self) -> list[tuple[str, int]]:
         return [client.get_addr() for client in self.get_clients()]
 
     def get_clients(self) -> list[_ConnectedClient]:
-        return [client for client in self._clients if client is not None]
+        return list(self._clients)
 
     def has_client_id(self, client_id: str) -> bool:
         return client_id in self._client_id_map
@@ -80,13 +86,3 @@ class ConnectedClients:
         if client is not None:
             client.touch()
 
-    # Defragments the list of clients so that no "None" clients exist
-    def _defragment_clients(self):
-        new_clients = []
-        for client in self._clients:
-            if client is not None:
-                new_clients.append(client)
-
-        self._clients = []
-        for client in new_clients:
-            self.register_client(client.get_id(), client.get_addr())
