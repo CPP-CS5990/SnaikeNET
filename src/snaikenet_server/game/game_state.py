@@ -94,14 +94,13 @@ class GameState:
         return set(self._players.keys() - self._dead_players)
 
     def delete_player(self, player_id: PlayerID) -> bool:
+        self._spectators.pop(player_id, None)
+
         if player_id not in self._players:
             return False
-        if self._spectators.get(player_id, None) is not None:
-            self._spectators.pop(player_id, None)
-        else:
-            self.kill_player(player_id, player_id)
-            self._players.pop(player_id, None)
-            self._dead_players.pop(player_id, None)
+        self.kill_player(player_id, player_id)
+        self._players.pop(player_id, None)
+        self._dead_players.pop(player_id, None)
 
         return True
 
