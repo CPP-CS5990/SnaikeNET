@@ -147,7 +147,7 @@ class SnaikenetServer:
         self.broadcast_game_end()
         if self._clean_idle_clients_task:
             logger.info("Stopping clean idle clients task...")
-            self._clean_idle_clients_task.cancel()
+            await self._clean_idle_clients_task.cancel()
         if self._udp_transport:
             logger.info("Stopping UDP server...")
             self._udp_transport.close()
