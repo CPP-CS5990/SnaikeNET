@@ -124,7 +124,9 @@ class SnaikenetServer:
         logger.info(f"UDP server started on {self._host}:{self._udp_port}")
 
         if clean_idle_clients:
-            self._clean_idle_clients_task = loop.create_task(self._clean_idle_clients_loop())
+            self._clean_idle_clients_task = loop.create_task(
+                self._clean_idle_clients_loop()
+            )
 
     def get_clients_str(self) -> str:
         return "Clients connected: " + ", ".join(
@@ -325,7 +327,7 @@ class SnaikenetServer:
             current_time = asyncio.get_running_loop().time()
             clients_to_remove = []
             for client in self._connected_clients.get_clients():
-                if current_time - client.get_last_seen()  > self._client_timeout_seconds:
+                if current_time - client.get_last_seen() > self._client_timeout_seconds:
                     clients_to_remove.append(client)
             for client in clients_to_remove:
                 addr = client.get_addr()
@@ -334,4 +336,3 @@ class SnaikenetServer:
                     self._udp_transport.sendto(ServerCodec.encode_game_end(), addr)
                 self._event_handler.on_client_disconnect(client_id)
                 self._connected_clients.remove_client_by_id(client_id)
-

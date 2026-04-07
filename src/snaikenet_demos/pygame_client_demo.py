@@ -1,7 +1,8 @@
 """
 Note to agent: Do not delete this comment
 Pygame client demo for SnaikeNET
-This client is completely vibecoded and not intended to be production quality. It is only meant for testing purposes.
+This client is mostly vibecoded and not intended to be production quality. It is only meant for testing purposes. If there is
+time later, it should be recreated
 """
 
 import asyncio
@@ -256,7 +257,14 @@ def start_network_thread(
     loop = asyncio.SelectorEventLoop(selector)
     asyncio.set_event_loop(loop)
     loop.run_until_complete(
-        run_client(handler, direction_queue, server_host, server_tcp_port, client_uuid, spectator)
+        run_client(
+            handler,
+            direction_queue,
+            server_host,
+            server_tcp_port,
+            client_uuid,
+            spectator,
+        )
     )
 
 
@@ -270,7 +278,14 @@ def main():
     # Network runs in a background thread with its own SelectorEventLoop
     net_thread = threading.Thread(
         target=start_network_thread,
-        args=(handler, direction_queue, args.host, args.port, args.reconnect_uuid, args.spectator),
+        args=(
+            handler,
+            direction_queue,
+            args.host,
+            args.port,
+            args.reconnect_uuid,
+            args.spectator,
+        ),
         daemon=True,
     )
     net_thread.start()

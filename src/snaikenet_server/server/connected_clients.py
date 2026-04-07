@@ -5,7 +5,6 @@ type AddrToIndex = dict[tuple[str, int], int]
 
 
 class _ConnectedClient:
-
     def __init__(self, client_id: str, addr: tuple[str, int]):
         self._client_id = client_id
         self._addr = addr

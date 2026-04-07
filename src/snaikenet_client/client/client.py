@@ -63,7 +63,9 @@ class SnaikenetClient:
             f"Sending registration message to server at {self._server_host}:{self._server_tcp_port}"
         )
         if uuid is None:
-            writer.write(ClientCodec.new_connection_initial_tcp_message(self._is_spectator))
+            writer.write(
+                ClientCodec.new_connection_initial_tcp_message(self._is_spectator)
+            )
         else:
             writer.write(ClientCodec.reconnect_initial_tcp_message(uuid))
 

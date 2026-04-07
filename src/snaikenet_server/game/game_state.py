@@ -285,10 +285,10 @@ class GameState:
         return states
 
     def _resolve_spectator_states(
-            self,
-            living_players: list[PlayerID],
-            spectator_map: dict[PlayerID, PlayerID | None],
-            states: dict[PlayerID, PlayerView],
+        self,
+        living_players: list[PlayerID],
+        spectator_map: dict[PlayerID, PlayerID | None],
+        states: dict[PlayerID, PlayerView],
     ) -> None:
         for player_id, spectatee in spectator_map.items():
             if spectatee is None or spectatee not in living_players:

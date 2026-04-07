@@ -47,7 +47,6 @@ class Game:
             self._tick_index += 1
             return self._tick_index
 
-
     def start_game(self):
         if not self._game_state.initialize_game_state():
             logger.error("Failed to initialize game state, cannot start game loop.\n")
@@ -95,7 +94,6 @@ class Game:
         self._start_event.clear()
         logger.info("Start signal received, starting game...\n")
         return self.restart_game()
-
 
     def should_restart(self) -> bool:
         with self._game_lock:
@@ -175,6 +173,7 @@ class Game:
     def _add_pending_player(self, player_id: PlayerID):
         self._pending_players.add(player_id)
 
+
 class _GameEventHandler(SnaikenetServerEventHandler):
     def __init__(self, game: Game):
         self._game = game
@@ -191,10 +190,13 @@ class _GameEventHandler(SnaikenetServerEventHandler):
         if spectator:
             self._game.add_spectator(client_id)
         elif self._game.is_being_played():
-            logger.info(f"Game is being played already. Player will be added to the next game")
+            logger.info(
+                f"Game is being played already. Player will be added to the next game"
+            )
             self._game.add_pending_player(client_id)
         else:
             self._game.add_new_player(client_id)
+
 
 async def game_loop(
     game: Game, tick_interval: float, host: str, tcp_port: int, udp_port: int
@@ -235,23 +237,24 @@ async def game_loop(
             if sleep_duration > 0.0:
                 await asyncio.sleep(sleep_duration)
             else:
-                logger.warning(
-                    f"Tick {tick_index} overran by {-sleep_duration:.4f}s\n"
-                )
+                logger.warning(f"Tick {tick_index} overran by {-sleep_duration:.4f}s\n")
 
             if tick_index % 100 == 0:
                 avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
                 real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
-                logger.debug(f"Tick {tick_index} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n")
+                logger.debug(
+                    f"Tick {tick_index} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
+                )
 
             if game.should_restart():
-                    logger.debug(f"All players are dead at tick {tick_index}, restarting game...\n")
-                    server.broadcast_game_restart()
-                    game.restart_game()
-                    await server.wait_start_game_timer(1)
-                    tick_times = collections.deque(maxlen=tick_times.maxlen)
-                    next_tick_time = time.perf_counter()
-
+                logger.debug(
+                    f"All players are dead at tick {tick_index}, restarting game...\n"
+                )
+                server.broadcast_game_restart()
+                game.restart_game()
+                await server.wait_start_game_timer(1)
+                tick_times = collections.deque(maxlen=tick_times.maxlen)
+                next_tick_time = time.perf_counter()
 
     logger.info(f"Stopping network servers...")
     await server.stop()

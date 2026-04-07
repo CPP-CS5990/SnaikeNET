@@ -68,7 +68,9 @@ async def main():
     loop = asyncio.get_running_loop()
 
     tick_interval = 1 / args.tick_rate
-    game = Game(loop, args.grid_size, viewport_distance_from_center=args.viewport_distance)
+    game = Game(
+        loop, args.grid_size, viewport_distance_from_center=args.viewport_distance
+    )
 
     def stop_server():
         game.stop_game()
