@@ -42,7 +42,7 @@ def test_encode_and_decode_player_state():
         length=3,
         kills=1,
         is_alive=True,
-        is_spectating=False
+        is_spectating=False,
     )
 
     encoded = ServerCodec.encode_player_game_state(

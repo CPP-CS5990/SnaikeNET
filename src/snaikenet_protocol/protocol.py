@@ -117,7 +117,7 @@ class ServerCodec:
             player_view.length,
             player_view.kills,
             1 if player_view.is_alive else 0,
-            1 if player_view.is_spectating else 0
+            1 if player_view.is_spectating else 0,
         )
 
         offset = header_size
@@ -218,7 +218,7 @@ class ClientCodec:
             num_kills=num_kills,
             is_alive=is_alive == 1,
             grid_data=grid_data,
-            is_spectating=is_spectating
+            is_spectating=is_spectating,
         )
 
     @staticmethod

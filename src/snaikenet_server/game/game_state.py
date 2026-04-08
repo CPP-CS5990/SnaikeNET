@@ -279,7 +279,9 @@ class GameState:
                 states[player_id] = player_state
 
         # Always send death frames, even if no one is alive
-        self._resolve_spectator_states(living_players, self._dead_players, states, death_frame=True)
+        self._resolve_spectator_states(
+            living_players, self._dead_players, states, death_frame=True
+        )
 
         # Only assign spectators to living players if there are any
         if living_players:
@@ -288,19 +290,21 @@ class GameState:
         return states
 
     def _resolve_spectator_states(
-            self,
-            living_players: list[PlayerID],
-            spectator_map: dict[PlayerID, PlayerID | None],
-            states: dict[PlayerID, PlayerView],
-            *,
-            death_frame: bool = False,
+        self,
+        living_players: list[PlayerID],
+        spectator_map: dict[PlayerID, PlayerID | None],
+        states: dict[PlayerID, PlayerView],
+        *,
+        death_frame: bool = False,
     ) -> None:
         for spectator_id, spectatee in spectator_map.items():
             if spectatee is None:
                 # Death frame: send the spectator their own state so they receive
                 # the death notification before switching to spectating.
                 if death_frame:
-                    player_state = self.create_player_state(spectator_id, is_spectating=False)
+                    player_state = self.create_player_state(
+                        spectator_id, is_spectating=False
+                    )
                     if player_state is not None:
                         states[spectator_id] = player_state
 
@@ -331,7 +335,7 @@ class GameState:
             kills=sum(1 for killee in self._kills.values() if killee != player_id),
             is_alive=not (is_spectating or player.is_dead()),
             viewport=self.get_player_viewport(player),
-            is_spectating=is_spectating
+            is_spectating=is_spectating,
         )
 
     def get_all_players(self):
