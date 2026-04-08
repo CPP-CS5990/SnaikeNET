@@ -168,10 +168,6 @@ class SnaikenetServer:
             if not raw:
                 return
 
-            logger.debug(
-                f"Received registration request from {peer}: {raw.decode().strip()}"
-            )
-
             msg = json.loads(raw.decode().strip())
             req_type = msg.get("type")
 
