@@ -27,6 +27,12 @@ uv run pygame_client_demo
 # run `uv run pygame_client_demo --help` to see what options are available for the demo (includes server host and port options)
 ```
 
+### Run pygame client demo as a spectator (useful for observing game without being an actual player)
+
+```bash
+uv run pygame_client_demo --spectator
+```
+
 
 ## Module Structure
 
