@@ -196,6 +196,7 @@ async def test_server_broadcast():
         kills=0,
         is_alive=True,
         length=1,
+        is_spectating=False
     )
 
     server.broadcast_game_state_frames({client_id: player_view}, 0)

@@ -278,24 +278,42 @@ class GameState:
             if player_state is not None:
                 states[player_id] = player_state
 
+        # Always send death frames, even if no one is alive
+        self._resolve_spectator_states(living_players, self._dead_players, states, death_frame=True)
+
+        # Only assign spectators to living players if there are any
         if living_players:
-            self._resolve_spectator_states(living_players, self._dead_players, states)
             self._resolve_spectator_states(living_players, self._spectators, states)
+
         return states
 
     def _resolve_spectator_states(
-        self,
-        living_players: list[PlayerID],
-        spectator_map: dict[PlayerID, PlayerID | None],
-        states: dict[PlayerID, PlayerView],
+            self,
+            living_players: list[PlayerID],
+            spectator_map: dict[PlayerID, PlayerID | None],
+            states: dict[PlayerID, PlayerView],
+            *,
+            death_frame: bool = False,
     ) -> None:
-        for player_id, spectatee in spectator_map.items():
-            if spectatee is None or spectatee not in living_players:
-                spectatee = random.choice(living_players)
-                spectator_map[player_id] = spectatee
+        for spectator_id, spectatee in spectator_map.items():
+            if spectatee is None:
+                # Death frame: send the spectator their own state so they receive
+                # the death notification before switching to spectating.
+                if death_frame:
+                    player_state = self.create_player_state(spectator_id, is_spectating=False)
+                    if player_state is not None:
+                        states[spectator_id] = player_state
+
+                # Assign a living player to follow going forward
+                if living_players:
+                    spectator_map[spectator_id] = random.choice(living_players)
+
+                continue
+
+            # Already assigned a spectatee — send their view
             player_state = self.create_player_state(spectatee, is_spectating=True)
             if player_state is not None:
-                states[player_id] = player_state
+                states[spectator_id] = player_state
 
     def create_player_state(
         self, player_id: PlayerID, is_spectating: bool = False
@@ -310,9 +328,10 @@ class GameState:
                 self._viewport_distance_from_center[1] * 2 + 1,
             ),
             length=len(player),
-            kills=sum(1 for killer in self._kills.values() if killer == player_id),
-            is_alive=not is_spectating,
+            kills=sum(1 for killee in self._kills.values() if killee != player_id),
+            is_alive=not (is_spectating or player.is_dead()),
             viewport=self.get_player_viewport(player),
+            is_spectating=is_spectating
         )
 
     def get_all_players(self):
@@ -326,12 +345,6 @@ class GameState:
 
 
 class PlayerView:
-    viewport_size: tuple[int, int]
-    length: int
-    kills: int
-    is_alive: bool
-    viewport: GridStructure
-
     def __init__(
         self,
         viewport_size: tuple[int, int],
@@ -339,9 +352,11 @@ class PlayerView:
         kills: int,
         is_alive: bool,
         viewport: GridStructure,
+        is_spectating: bool,
     ):
         self.viewport_size = viewport_size
         self.length = length
         self.kills = kills
         self.is_alive = is_alive
         self.viewport = viewport
+        self.is_spectating = is_spectating

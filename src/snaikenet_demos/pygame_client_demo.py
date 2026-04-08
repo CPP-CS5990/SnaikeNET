@@ -81,8 +81,11 @@ class QueueClientEventHandler(SnaikenetClientEventHandler):
     def on_game_state_update(self, frame: ClientGameStateFrame):
         logger.debug(
             f"Received game state frame: seq={frame.sequence_number}, "
-            f"length={frame.player_length}, kills={frame.num_kills}, alive={frame.is_alive}"
+            f"length={frame.player_length}, kills={frame.num_kills}, alive={frame.is_alive}, is_spectating={frame.is_spectating}"
         )
+        if not frame.is_alive and not frame.is_spectating:
+            logger.info("You have died...")
+
         self.event_queue.put(ClientEvent(kind="frame", frame=frame))
         if self._curr_sequence_number + 1 != frame.sequence_number:
             logger.warning(f"Out of order sequence numbers: {frame.sequence_number}")

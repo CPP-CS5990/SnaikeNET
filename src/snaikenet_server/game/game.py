@@ -232,7 +232,7 @@ async def game_loop(
         next_tick_time = time.perf_counter()
         tick_times = collections.deque(maxlen=100)
 
-        while game.game_should_continue():
+        while game.game_should_continue() and game.is_running():
             tick_start_time = time.perf_counter()
 
             tick_index = game.tick()
@@ -260,6 +260,8 @@ async def game_loop(
                 logger.debug(
                     f"All players are dead at tick {tick_index}, restarting game...\n"
                 )
+                # wait for players to receive the last frame for this game
+                await asyncio.sleep(1)
                 server.broadcast_game_restart()
                 game.restart_game()
                 await server.wait_start_game_timer(1)

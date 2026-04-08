@@ -161,9 +161,6 @@ class SnaikenetClient:
         if self._udp_transport.is_closing():
             return
 
-        logger.debug(
-            f"Sending direction {self._direction} to server at {self._server_host}:{self._server_udp_port} via UDP"
-        )
         self._udp_transport.sendto(ClientCodec.encode_direction(self._direction))
 
     def set_direction(self, direction: ClientDirection):
