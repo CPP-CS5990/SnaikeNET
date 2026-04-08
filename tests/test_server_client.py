@@ -19,7 +19,7 @@ async def test_client_tcp_registration():
     # Create and start server
     server = SnaikenetServer(tcp_port=0, udp_port=0)
     await server.start()
-    asyncio.create_task(server.server_forever())
+    asyncio.create_task(server.serve_forever())
     print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
 
     # Create and start client
@@ -58,7 +58,7 @@ async def test_client_send_and_receive_direction():
                 and self._received_client_id_future.done()
             )
 
-        def on_new_client_connect(self, client_id: str):
+        def on_new_client_connect(self, client_id: str, spectator: bool = False):
             pass
 
         def on_client_disconnect(self, client_id: str):
@@ -88,7 +88,7 @@ async def test_client_send_and_receive_direction():
     # Create and start server
     server = SnaikenetServer(event_handler=event_handler, tcp_port=0, udp_port=0)
     await server.start()
-    asyncio.create_task(server.server_forever())
+    asyncio.create_task(server.serve_forever())
     print(f"Server started at {server.get_host()}:{server.get_udp_port()}")
 
     # Create and start client
@@ -126,7 +126,7 @@ async def test_server_broadcast():
     # Create and start server
     server = SnaikenetServer(tcp_port=0, udp_port=0)
     await server.start()
-    asyncio.create_task(server.server_forever())
+    asyncio.create_task(server.serve_forever())
     print(f"Server started at {server.get_host()}:{server.get_tcp_port()}")
 
     class _TestBroadcastEventHandler(SnaikenetClientEventHandler):
@@ -196,6 +196,7 @@ async def test_server_broadcast():
         kills=0,
         is_alive=True,
         length=1,
+        is_spectating=False,
     )
 
     server.broadcast_game_state_frames({client_id: player_view}, 0)
@@ -220,4 +221,114 @@ async def test_server_broadcast():
     # We would need to implement a way for the client to receive broadcast messages in order to test this properly. For now, we will just assume that if the code reaches this point without errors, the broadcast was successful.
 
     await client.stop()
+    await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_spectator_client_registration():
+    """A client connecting with spectator=True should trigger on_new_client_connect with spectator=True
+    and should not be treated as a regular player."""
+    loop = asyncio.get_running_loop()
+
+    class _SpectatorEventHandler(SnaikenetServerEventHandler):
+        def __init__(self):
+            self._connect_future: asyncio.Future[tuple[str, bool]] = (
+                loop.create_future()
+            )
+
+        def on_new_client_connect(self, client_id: str, spectator: bool = False):
+            if not self._connect_future.done():
+                self._connect_future.set_result((client_id, spectator))
+
+        def on_client_disconnect(self, client_id: str):
+            pass
+
+        def on_receive_direction(self, client_id: str, direction: Direction):
+            pass
+
+    event_handler = _SpectatorEventHandler()
+    server = SnaikenetServer(event_handler=event_handler, tcp_port=0, udp_port=0)
+    await server.start(clean_idle_clients=False)
+    asyncio.create_task(server.serve_forever())
+
+    client = SnaikenetClient(
+        server_host=server.get_host(),
+        server_tcp_port=server.get_tcp_port(),
+        is_spectator=True,
+    )
+    await client.start()
+
+    connected_id, was_spectator = await asyncio.wait_for(
+        event_handler._connect_future, timeout=5.0
+    )
+
+    assert connected_id == client.get_client_id()
+    assert was_spectator is True
+    assert client.get_client_id() in server.get_client_ids()
+
+    await client.stop()
+    await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_idle_client_cleanup():
+    """A client that stops sending heartbeats should be removed after client_timeout_seconds.
+    A client that keeps sending heartbeats should remain connected."""
+    loop = asyncio.get_running_loop()
+
+    class _DisconnectEventHandler(SnaikenetServerEventHandler):
+        def __init__(self):
+            self._disconnect_future: asyncio.Future[str] = loop.create_future()
+
+        def on_new_client_connect(self, client_id: str, spectator: bool = False):
+            pass
+
+        def on_client_disconnect(self, client_id: str):
+            if not self._disconnect_future.done():
+                self._disconnect_future.set_result(client_id)
+
+        def on_receive_direction(self, client_id: str, direction: Direction):
+            pass
+
+    event_handler = _DisconnectEventHandler()
+    timeout_seconds = 0.5
+    server = SnaikenetServer(
+        event_handler=event_handler,
+        tcp_port=0,
+        udp_port=0,
+        client_timeout_seconds=timeout_seconds,
+    )
+    await server.start(clean_idle_clients=True)
+    asyncio.create_task(server.serve_forever())
+
+    # Connect two clients: one will keep heartbeating, the other will go silent
+    active_client = SnaikenetClient(
+        server_host=server.get_host(),
+        server_tcp_port=server.get_tcp_port(),
+    )
+    idle_client = SnaikenetClient(
+        server_host=server.get_host(),
+        server_tcp_port=server.get_tcp_port(),
+    )
+    await active_client.start()
+    await idle_client.start()
+
+    assert active_client.get_client_id() in server.get_client_ids()
+    assert idle_client.get_client_id() in server.get_client_ids()
+
+    # Stop the idle client's heartbeat so it becomes idle
+    idle_client._heartbeat_task.cancel()
+
+    # Wait for the idle client to be cleaned up
+    disconnected_id = await asyncio.wait_for(
+        event_handler._disconnect_future, timeout=timeout_seconds + 2
+    )
+
+    assert disconnected_id == idle_client.get_client_id()
+    assert idle_client.get_client_id() not in server.get_client_ids()
+    # Active client should still be connected
+    assert active_client.get_client_id() in server.get_client_ids()
+
+    await active_client.stop()
+    await idle_client.stop()
     await server.stop()

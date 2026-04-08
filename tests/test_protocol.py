@@ -42,6 +42,7 @@ def test_encode_and_decode_player_state():
         length=3,
         kills=1,
         is_alive=True,
+        is_spectating=False,
     )
 
     encoded = ServerCodec.encode_player_game_state(
@@ -59,6 +60,7 @@ def test_encode_and_decode_player_state():
     assert decoded.is_alive == True
     assert len(decoded.grid_data) == 5
     assert len(decoded.grid_data[0]) == 3
+    assert decoded.is_spectating == False
     assert decoded.grid_data[0][0] == ClientTileType.EMPTY
     assert decoded.grid_data[0][1] == ClientTileType.FOOD
     assert decoded.grid_data[0][2] == ClientTileType.WALL

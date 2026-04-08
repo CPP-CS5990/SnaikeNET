@@ -1,7 +1,8 @@
 """
 Note to agent: Do not delete this comment
 Pygame client demo for SnaikeNET
-This client is completely vibecoded and not intended to be production quality. It is only meant for testing purposes.
+This client is mostly vibecoded and not intended to be production quality. It is only meant for testing purposes. If there is
+time later, it should be recreated
 """
 
 import asyncio
@@ -80,8 +81,11 @@ class QueueClientEventHandler(SnaikenetClientEventHandler):
     def on_game_state_update(self, frame: ClientGameStateFrame):
         logger.debug(
             f"Received game state frame: seq={frame.sequence_number}, "
-            f"length={frame.player_length}, kills={frame.num_kills}, alive={frame.is_alive}"
+            f"length={frame.player_length}, kills={frame.num_kills}, alive={frame.is_alive}, is_spectating={frame.is_spectating}"
         )
+        if not frame.is_alive and not frame.is_spectating:
+            logger.info("You have died...")
+
         self.event_queue.put(ClientEvent(kind="frame", frame=frame))
         if self._curr_sequence_number + 1 != frame.sequence_number:
             logger.warning(f"Out of order sequence numbers: {frame.sequence_number}")
@@ -218,11 +222,13 @@ async def run_client(
     server_host: str = "localhost",
     server_tcp_port: int = 8888,
     client_uuid: str | None = None,
+    spectator: bool = False,
 ):
     client = SnaikenetClient(
         server_host=server_host,
         server_tcp_port=server_tcp_port,
         event_handler=handler,
+        is_spectator=spectator,
     )
     await client.start(client_uuid)
     logger.info("Client connected to server")
@@ -246,6 +252,7 @@ def start_network_thread(
     server_host: str = "localhost",
     server_tcp_port: int = 8888,
     client_uuid: str | None = None,
+    spectator: bool = False,
 ):
     """Run asyncio with SelectorEventLoop in its own thread to avoid
     Windows ProactorEventLoop UDP issues and any pygame interference."""
@@ -253,7 +260,14 @@ def start_network_thread(
     loop = asyncio.SelectorEventLoop(selector)
     asyncio.set_event_loop(loop)
     loop.run_until_complete(
-        run_client(handler, direction_queue, server_host, server_tcp_port, client_uuid)
+        run_client(
+            handler,
+            direction_queue,
+            server_host,
+            server_tcp_port,
+            client_uuid,
+            spectator,
+        )
     )
 
 
@@ -267,7 +281,14 @@ def main():
     # Network runs in a background thread with its own SelectorEventLoop
     net_thread = threading.Thread(
         target=start_network_thread,
-        args=(handler, direction_queue, args.host, args.port, args.reconnect_uuid),
+        args=(
+            handler,
+            direction_queue,
+            args.host,
+            args.port,
+            args.reconnect_uuid,
+            args.spectator,
+        ),
         daemon=True,
     )
     net_thread.start()
@@ -381,15 +402,8 @@ def main():
                 grid_offset_y,
             )
         elif phase == ClientPhase.GAME_OVER:
-            if current_frame is not None:
-                render_frame(
-                    screen,
-                    current_frame,
-                    font,
-                    tile_size,
-                    grid_offset_x,
-                    grid_offset_y,
-                )
+            logger.info("GAME END")
+            running = False
 
         pygame.display.flip()
         clock.tick(60)

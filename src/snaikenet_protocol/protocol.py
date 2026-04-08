@@ -18,7 +18,7 @@ class UdpMsgType(Enum):
     # Additional header formats shouldn't include the order since the header already specifies it, and should be in network byte order (big-endian)
     GAME_STATE_FRAME_UPDATE = (
         0x01,
-        "!IBBHBB",
+        "!IBBHBBB",
     )  # sequence number, viewport width, viewport height, player length, num kills, is alive. Followed by grid data (1 byte per tile, row-major order)
     GAME_START = (0x02, "!BB")  # viewport width, viewport height
     GAME_END = (0x03, None)
@@ -117,6 +117,7 @@ class ServerCodec:
             player_view.length,
             player_view.kills,
             1 if player_view.is_alive else 0,
+            1 if player_view.is_spectating else 0,
         )
 
         offset = header_size
@@ -185,7 +186,7 @@ class ClientCodec:
             )
 
         header_size = UdpMsgType.GAME_STATE_FRAME_UPDATE.full_size
-        seq, vp_width, vp_height, player_length, num_kills, is_alive = (
+        seq, vp_width, vp_height, player_length, num_kills, is_alive, is_spectating = (
             UdpMsgType.GAME_STATE_FRAME_UPDATE.unpack_from(message_bytes)
         )
 
@@ -217,6 +218,7 @@ class ClientCodec:
             num_kills=num_kills,
             is_alive=is_alive == 1,
             grid_data=grid_data,
+            is_spectating=is_spectating,
         )
 
     @staticmethod
@@ -246,15 +248,15 @@ class ClientCodec:
         return seconds_until_start
 
     @staticmethod
-    def new_connection_initial_tcp_message():
-        return _to_json({"type": "new"})
+    def new_connection_initial_tcp_message(spectator: bool = False) -> bytes:
+        return _to_json({"type": "new", "spectator": spectator})
 
     @staticmethod
     def reconnect_initial_tcp_message(uuid: str):
         return _to_json({"type": "reconnect", "uuid": uuid})
 
     @staticmethod
-    def hole_punch_udp_message(client_uuid: str):
+    def hole_punch_udp_message(client_uuid: str) -> bytes:
         return _to_json({"type": "hole_punch", "uuid": client_uuid})
 
     @staticmethod
@@ -265,3 +267,7 @@ class ClientCodec:
                 "direction": direction.value,
             }
         )
+
+    @staticmethod
+    def heartbeat_message():
+        return _to_json({"type": "heartbeat"})

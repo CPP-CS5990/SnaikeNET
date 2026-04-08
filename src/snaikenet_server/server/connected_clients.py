@@ -1,18 +1,14 @@
-import time
+import asyncio
 
-type ClientToAddr = dict[str, int]
-type AddrToClient = dict[tuple[str, int], int]
+type ClientIdToIndex = dict[str, int]
+type AddrToIndex = dict[tuple[str, int], int]
 
 
 class _ConnectedClient:
-    _client_id: str
-    _addr: tuple[str, int]
-    last_seen: float
-
     def __init__(self, client_id: str, addr: tuple[str, int]):
         self._client_id = client_id
         self._addr = addr
-        self.last_seen = time.time()
+        self._last_seen = asyncio.get_running_loop().time()
 
     def get_id(self):
         return self._client_id
@@ -20,19 +16,18 @@ class _ConnectedClient:
     def get_addr(self):
         return self._addr
 
+    def get_last_seen(self):
+        return self._last_seen
+
     def touch(self):
-        self.last_seen = time.time()
+        self._last_seen = asyncio.get_running_loop().time()
 
 
 class ConnectedClients:
-    _client_id_map: ClientToAddr
-    _addr_map: AddrToClient
-    _clients: list[_ConnectedClient]
-
     def __init__(self):
-        self._client_id_map = {}
-        self._addr_map = {}
-        self._clients = []
+        self._client_id_map: ClientIdToIndex = {}
+        self._addr_map: AddrToIndex = {}
+        self._clients: list[_ConnectedClient] = []
 
     def register_client(self, client_id: str, addr: tuple[str, int]):
         client = _ConnectedClient(client_id, addr)
@@ -53,24 +48,24 @@ class ConnectedClients:
             return None
         return self._clients[index]
 
-    def pop_client_by_id(self, client_id: str) -> _ConnectedClient | None:
+    def remove_client_by_id(self, client_id: str):
         index = self._client_id_map.pop(client_id, None)
         if index is None:
-            return None
+            return
         client = self._clients[index]
         self._addr_map.pop(client.get_addr(), None)
-        return client
 
-    def remove_client_by_addr(self, addr: tuple[str, int]):
-        index = self._addr_map.pop(addr, None)
-        if index is None:
-            return None
-        client = self._clients[index]
-        self._client_id_map.pop(client.get_id(), None)
-        return client
+        last_index = len(self._clients) - 1
+        if index != last_index and index is not None:
+            # Swap removed client with the last client and update its indices
+            last_client = self._clients[last_index]
+            self._clients[index] = last_client
+            self._client_id_map[last_client.get_id()] = index
+            self._addr_map[last_client.get_addr()] = index
+        self._clients.pop()
 
     def get_client_addrs(self) -> list[tuple[str, int]]:
-        return [client.get_addr() for client in self._clients]
+        return [client.get_addr() for client in self.get_clients()]
 
     def get_clients(self) -> list[_ConnectedClient]:
         return list(self._clients)

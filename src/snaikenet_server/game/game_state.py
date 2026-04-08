@@ -15,15 +15,26 @@ class GameState:
         grid_size: GridSize,
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
-        self._dead_players: set[PlayerID] = set()
+        self._dead_players: dict[PlayerID, PlayerID | None] = {}
         self._players: dict[PlayerID, SnakePlayer] = {}
+        self._spectators: dict[PlayerID, PlayerID | None] = {}
         self._kills: dict[PlayerID, PlayerID] = {}
         self._grid: Grid = Grid(grid_size)
         self._viewport_distance_from_center: tuple[int, int] = (
             viewport_distance_from_center
         )
-        self._spectators: dict[PlayerID, PlayerID] = {}
         self._max_num_food: int = 1
+
+    def reset_game_state(self):
+        players = dict(self._players)
+        spectators = dict(self._spectators)
+        max_num_food = self._max_num_food
+
+        self.__init__(self.get_grid_size(), self._viewport_distance_from_center)
+
+        self._players = players
+        self._spectators = spectators
+        self._max_num_food = max_num_food
 
     def get_viewport_distance_from_center(self) -> tuple[int, int]:
         return self._viewport_distance_from_center
@@ -36,7 +47,7 @@ class GameState:
             else:
                 self._kills[player_id] = killer
             player.die()
-            self._dead_players.add(player_id)
+            self._dead_players[player_id] = None
             for position in player:
                 self._grid.remove_player_at(
                     position, player_id
@@ -61,6 +72,13 @@ class GameState:
         )
         return player_id_
 
+    def add_spectator(self, player_id: PlayerID = None):
+        if player_id is None:
+            player_id_ = str(uuid.uuid4())
+        else:
+            player_id_ = player_id
+        self._spectators[player_id_] = None
+
     def set_player_direction(self, player_id: PlayerID, player_direction: Direction):
         player = self._players.get(player_id, None)
         if player is not None:
@@ -76,16 +94,14 @@ class GameState:
         return set(self._players.keys() - self._dead_players)
 
     def delete_player(self, player_id: PlayerID) -> bool:
+        self._spectators.pop(player_id, None)
+
         if player_id not in self._players:
             return False
-        while len(self._players[player_id]) > 0:
-            tail_position = self._players[player_id].remove_tail()
-            self._grid.remove_player_at(
-                tail_position, player_id
-            )  # Mark the old tail position as empty on the grid
-        self._players.pop(player_id)
-        self._spectators.pop(player_id)
-        self._dead_players.remove(player_id)
+        self.kill_player(player_id, player_id)
+        self._players.pop(player_id, None)
+        self._dead_players.pop(player_id, None)
+
         return True
 
     def position_outside_grid(self, position: Position) -> bool:
@@ -262,17 +278,46 @@ class GameState:
             if player_state is not None:
                 states[player_id] = player_state
 
-        for player_id in self._dead_players:
-            if len(living_players) > 0:
-                spectatee = self._spectators.get(player_id, None)
-                if spectatee is None or spectatee not in living_players:
-                    spectatee = random.choice(living_players)
-                    self._spectators[player_id] = spectatee
-                player_state = self.create_player_state(spectatee, is_spectating=True)
-                if player_state is not None:
-                    states[player_id] = player_state
+        # Always send death frames, even if no one is alive
+        self._resolve_spectator_states(
+            living_players, self._dead_players, states, death_frame=True
+        )
+
+        # Only assign spectators to living players if there are any
+        if living_players:
+            self._resolve_spectator_states(living_players, self._spectators, states)
 
         return states
+
+    def _resolve_spectator_states(
+        self,
+        living_players: list[PlayerID],
+        spectator_map: dict[PlayerID, PlayerID | None],
+        states: dict[PlayerID, PlayerView],
+        *,
+        death_frame: bool = False,
+    ) -> None:
+        for spectator_id, spectatee in spectator_map.items():
+            if spectatee is None:
+                # Death frame: send the spectator their own state so they receive
+                # the death notification before switching to spectating.
+                if death_frame:
+                    player_state = self.create_player_state(
+                        spectator_id, is_spectating=False
+                    )
+                    if player_state is not None:
+                        states[spectator_id] = player_state
+
+                # Assign a living player to follow going forward
+                if living_players:
+                    spectator_map[spectator_id] = random.choice(living_players)
+
+                continue
+
+            # Already assigned a spectatee — send their view
+            player_state = self.create_player_state(spectatee, is_spectating=True)
+            if player_state is not None:
+                states[spectator_id] = player_state
 
     def create_player_state(
         self, player_id: PlayerID, is_spectating: bool = False
@@ -287,25 +332,23 @@ class GameState:
                 self._viewport_distance_from_center[1] * 2 + 1,
             ),
             length=len(player),
-            kills=sum(1 for killer in self._kills.values() if killer == player_id),
-            is_alive=is_spectating or not player.is_dead(),
+            kills=sum(1 for killee in self._kills.values() if killee != player_id),
+            is_alive=not (is_spectating or player.is_dead()),
             viewport=self.get_player_viewport(player),
+            is_spectating=is_spectating,
         )
 
     def get_all_players(self):
         return set(self._players.keys())
+
+    def get_all_spectators(self):
+        return set(self._spectators.keys())
 
     def all_players_dead(self):
         return len(self._dead_players) == len(self._players)
 
 
 class PlayerView:
-    viewport_size: tuple[int, int]
-    length: int
-    kills: int
-    is_alive: bool
-    viewport: GridStructure
-
     def __init__(
         self,
         viewport_size: tuple[int, int],
@@ -313,9 +356,11 @@ class PlayerView:
         kills: int,
         is_alive: bool,
         viewport: GridStructure,
+        is_spectating: bool,
     ):
         self.viewport_size = viewport_size
         self.length = length
         self.kills = kills
         self.is_alive = is_alive
         self.viewport = viewport
+        self.is_spectating = is_spectating

@@ -5,7 +5,7 @@ from snaikenet_server.game.types import Direction
 
 class SnaikenetServerEventHandler(ABC):
     @abstractmethod
-    def on_new_client_connect(self, client_id: str): ...
+    def on_new_client_connect(self, client_id: str, spectator: bool = False): ...
 
     @abstractmethod
     def on_client_disconnect(self, client_id: str): ...
@@ -15,7 +15,7 @@ class SnaikenetServerEventHandler(ABC):
 
 
 class DefaultSnaikenetServerEventHandler(SnaikenetServerEventHandler):
-    def on_new_client_connect(self, client_id: str):
+    def on_new_client_connect(self, client_id: str, spectator: bool = False):
         pass
 
     def on_client_disconnect(self, client_id: str):

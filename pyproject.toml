@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.4.2",
     "pygame-ce>=2.5.7",
     "ruff>=0.15.5",
+    "torch>=2.6.0",
 ]
 
 [build-system]
@@ -21,6 +22,7 @@ server = "snaikenet_server.__main__:run_main"
 visualize_gamestate = "snaikenet_server.game.visualize_gamestate:main"
 prototype = "snaikenet_server.game.prototype_game:main"
 pygame_client_demo = "snaikenet_demos.pygame_client_demo:main"
+rl-agent = "snaikenet_rl.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

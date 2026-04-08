@@ -10,6 +10,8 @@ class ArgNamespace(argparse.Namespace):
     grid_size: tuple[int, int]
     viewport_distance: tuple[int, int]
     tick_rate: int
+    clean_idle_clients: bool
+    client_timeout: float
 
 
 def parse_args() -> ArgNamespace:
@@ -65,6 +67,19 @@ def parse_args() -> ArgNamespace:
         type=int,
         default=6,
         help="Game tick rate in ticks per second (default: 6)",
+    )
+    parser.add_argument(
+        "--client-timeout",
+        type=float,
+        default=20,
+        help="Seconds before an idle client is cleaned up (default: 20)",
+    )
+    parser.add_argument(
+        "--no-clean-idle-clients",
+        action="store_false",
+        dest="clean_idle_clients",
+        default=True,
+        help="Disable automatic cleanup of idle clients (enabled by default)",
     )
     args = parser.parse_args(namespace=ArgNamespace())
     args.grid_size = tuple(args.grid_size)
