@@ -1,3 +1,4 @@
+import math
 import random
 import uuid
 
@@ -204,7 +205,13 @@ class GameState:
 
     def _initialize_food_positions(self):
         self._grid.fill_available_food_positions()
-        self._max_num_food = max(1, len(self._players) * 5)
+        grid_size_x, grid_size_y = self.get_grid_size()
+        # Maximum possible would be half the grid size filled with food
+        self._max_num_food = int(min(
+            max(1, ((grid_size_x * grid_size_y) * 0.0025 * (math.log(len(self._players)) + 1))),
+            (grid_size_x * grid_size_y) / 2
+        ))
+        logger.debug(f"Initialized max number of food with {self._max_num_food}")
         for _ in range(self._max_num_food):
             food_position = self._grid.get_random_available_food_position()
             if food_position is not None:
