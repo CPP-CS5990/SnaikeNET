@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import IntEnum
 
 from loguru import logger
 
@@ -113,7 +113,7 @@ class Grid:
         return viewport
 
 
-class TileType(Enum):
+class TileType(IntEnum):
     EMPTY = 0
     WALL = 1
     FOOD = 2
@@ -121,16 +121,12 @@ class TileType(Enum):
 
 
 class TileData:
-    tile_type: TileType
-    player_ids: list[
-        PlayerID
-    ]  # Multiple players can occupy the same tile temporarily during collisions
-
     def __init__(self, tile_type: TileType = TileType.EMPTY, player_ids=None):
         if player_ids is None:
             player_ids = []
-        self.tile_type = tile_type
-        self.player_ids = player_ids
+        self.tile_type: TileType = tile_type
+        # Multiple players can occupy the same tile temporarily during collisions
+        self.player_ids: list[PlayerID] = player_ids
 
     def add_player(self, player_id: PlayerID):
         if player_id not in self.player_ids:
