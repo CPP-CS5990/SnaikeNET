@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import IntEnum
 
 type ClientGridStructure = list[list[ClientTileType]]
 
 
-class ClientTileType(Enum):
+class ClientTileType(IntEnum):
     EMPTY = 0
     WALL = 1
     FOOD = 2
@@ -11,7 +11,7 @@ class ClientTileType(Enum):
     OTHER_SNAKE = 4  # Used for distinguishing the player's own snake from other snakes in the viewport
 
 
-class ClientDirection(Enum):
+class ClientDirection(IntEnum):
     NORTH = 0
     SOUTH = 1
     EAST = 2
