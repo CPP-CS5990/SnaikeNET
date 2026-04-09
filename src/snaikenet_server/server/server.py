@@ -82,13 +82,17 @@ class SnaikenetServer:
         for dest in self._connected_clients.get_client_addrs():
             self._udp_transport.sendto(ServerCodec.encode_game_end(), dest)
 
-    def broadcast_game_state_frames(
+    async def broadcast_game_state_frames(
         self, client_frames: dict[str, PlayerView], sequence_number: int
     ):
-        for uuid, frame in client_frames.items():
-            self._broadcast_game_state_frame(uuid, frame, sequence_number)
+        await asyncio.gather(
+            *(
+                self._broadcast_game_state_frame(uuid, frame, sequence_number)
+                for uuid, frame in client_frames.items()
+            )
+        )
 
-    def _broadcast_game_state_frame(
+    async def _broadcast_game_state_frame(
         self, client_id: str, client_frame: PlayerView, sequence_number: int
     ):
         if self._udp_transport is None:
@@ -96,12 +100,13 @@ class SnaikenetServer:
             return
         dest = self._connected_clients.get_client_by_id(client_id)
         if dest is not None:
-            self._udp_transport.sendto(
-                ServerCodec.encode_player_game_state(
-                    client_id, client_frame, sequence_number
-                ),
-                dest.get_addr(),
+            encoded = await asyncio.to_thread(
+                ServerCodec.encode_player_game_state,
+                client_id,
+                client_frame,
+                sequence_number,
             )
+            self._udp_transport.sendto(encoded, dest.get_addr())
 
     @staticmethod
     def _log_udp_not_initialized():

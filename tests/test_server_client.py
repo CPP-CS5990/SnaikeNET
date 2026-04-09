@@ -199,7 +199,7 @@ async def test_server_broadcast():
         is_spectating=False,
     )
 
-    server.broadcast_game_state_frames({client_id: player_view}, 0)
+    await server.broadcast_game_state_frames({client_id: player_view}, 0)
 
     broadcast = await event_handler.wait_for_broadcast()
     event_handler.reset_future()
@@ -210,7 +210,7 @@ async def test_server_broadcast():
 
     player_view.is_alive = False
 
-    server.broadcast_game_state_frames({client_id: player_view}, 1)
+    await server.broadcast_game_state_frames({client_id: player_view}, 1)
     broadcast = await event_handler.wait_for_broadcast()
     event_handler.reset_future()
 
