@@ -117,6 +117,7 @@ class Grid:
                         viewport[offset] = 3 if player_id in tile.player_ids else 4
                 else:
                     viewport[offset] = TileType.WALL
+                offset += 1
         return bytes(viewport)
 
 

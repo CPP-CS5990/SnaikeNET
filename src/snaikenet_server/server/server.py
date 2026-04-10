@@ -87,17 +87,13 @@ class SnaikenetServer:
         self, client_frames: dict[str, PlayerView], sequence_number: int
     ):
         start_broadcast_time = time.perf_counter()
-        await asyncio.gather(
-            *(
-                self._broadcast_game_state_frame(uuid, frame, sequence_number)
-                for uuid, frame in client_frames.items()
-            )
-        )
+        for uuid, frame in client_frames.items():
+            self._broadcast_game_state_frame(uuid, frame, sequence_number)
         logger.debug(
             f"{(time.perf_counter() - start_broadcast_time) * 1000:.3f}ms to broadcast game state frames to all clients"
         )
 
-    async def _broadcast_game_state_frame(
+    def _broadcast_game_state_frame(
         self, client_id: str, client_frame: PlayerView, sequence_number: int
     ):
         if self._udp_transport is None:
@@ -105,8 +101,7 @@ class SnaikenetServer:
             return
         dest = self._connected_clients.get_client_by_id(client_id)
         if dest is not None:
-            encoded = await asyncio.to_thread(
-                ServerCodec.encode_player_game_state,
+            encoded = ServerCodec.encode_player_game_state(
                 client_frame,
                 sequence_number,
             )
