@@ -1,6 +1,5 @@
 import json
 from snaikenet_server.game.game_state import PlayerView
-from snaikenet_server.game.grid import TileType, TileData
 from snaikenet_client.types import ClientTileType
 
 from snaikenet_protocol.protocol import ServerCodec, ClientCodec, UdpMsgType
@@ -9,36 +8,18 @@ from snaikenet_server.game.types import Direction
 
 
 def test_encode_and_decode_player_state():
-    player_id = "player1"
+    # Viewport is now pre-serialized bytes (5 rows x 3 cols = 15 bytes)
+    # Values: EMPTY=0, WALL=1, FOOD=2, SNAKE=3, OTHER_SNAKE=4
+    viewport_bytes = bytes([
+        0, 2, 1,  # row 0: EMPTY, FOOD, WALL
+        0, 1, 2,  # row 1: EMPTY, WALL, SNAKE (own)
+        0, 3, 1,  # row 2: EMPTY, FOOD, WALL
+        0, 1, 4,  # row 3: EMPTY, WALL, OTHER_SNAKE
+        0, 1, 4,  # row 4: EMPTY, WALL, OTHER_SNAKE
+    ])
     player_view = PlayerView(
         viewport_size=(3, 5),
-        viewport=[
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.FOOD),
-                TileData(TileType.WALL),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.WALL),
-                TileData(TileType.SNAKE, player_ids=["player1"]),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.FOOD),
-                TileData(TileType.WALL),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.WALL),
-                TileData(TileType.SNAKE, player_ids=["player2"]),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.WALL),
-                TileData(TileType.SNAKE, player_ids=["player3"]),
-            ],
-        ],
+        viewport=viewport_bytes,
         length=3,
         kills=1,
         is_alive=True,
@@ -46,7 +27,7 @@ def test_encode_and_decode_player_state():
     )
 
     encoded = ServerCodec.encode_player_game_state(
-        player_id, player_view, sequence_number=42
+        player_view, sequence_number=42
     )
 
     message_type = ClientCodec.peek_udp_msg_type(encoded)
@@ -66,9 +47,9 @@ def test_encode_and_decode_player_state():
     assert decoded.grid_data[0][2] == ClientTileType.WALL
     assert decoded.grid_data[1][0] == ClientTileType.EMPTY
     assert decoded.grid_data[1][1] == ClientTileType.WALL
-    assert decoded.grid_data[1][2] == ClientTileType.SNAKE
+    assert decoded.grid_data[1][2] == ClientTileType.FOOD
     assert decoded.grid_data[2][0] == ClientTileType.EMPTY
-    assert decoded.grid_data[2][1] == ClientTileType.FOOD
+    assert decoded.grid_data[2][1] == ClientTileType.SNAKE
     assert decoded.grid_data[2][2] == ClientTileType.WALL
     assert decoded.grid_data[3][0] == ClientTileType.EMPTY
     assert decoded.grid_data[3][1] == ClientTileType.WALL
