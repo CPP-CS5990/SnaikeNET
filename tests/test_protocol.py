@@ -10,13 +10,25 @@ from snaikenet_server.game.types import Direction
 def test_encode_and_decode_player_state():
     # Viewport is now pre-serialized bytes (5 rows x 3 cols = 15 bytes)
     # Values: EMPTY=0, WALL=1, FOOD=2, SNAKE=3, OTHER_SNAKE=4
-    viewport_bytes = bytes([
-        0, 2, 1,  # row 0: EMPTY, FOOD, WALL
-        0, 1, 2,  # row 1: EMPTY, WALL, SNAKE (own)
-        0, 3, 1,  # row 2: EMPTY, FOOD, WALL
-        0, 1, 4,  # row 3: EMPTY, WALL, OTHER_SNAKE
-        0, 1, 4,  # row 4: EMPTY, WALL, OTHER_SNAKE
-    ])
+    viewport_bytes = bytes(
+        [
+            0,
+            2,
+            1,  # row 0: EMPTY, FOOD, WALL
+            0,
+            1,
+            2,  # row 1: EMPTY, WALL, SNAKE (own)
+            0,
+            3,
+            1,  # row 2: EMPTY, FOOD, WALL
+            0,
+            1,
+            4,  # row 3: EMPTY, WALL, OTHER_SNAKE
+            0,
+            1,
+            4,  # row 4: EMPTY, WALL, OTHER_SNAKE
+        ]
+    )
     player_view = PlayerView(
         viewport_size=(3, 5),
         viewport=viewport_bytes,
@@ -26,9 +38,7 @@ def test_encode_and_decode_player_state():
         is_spectating=False,
     )
 
-    encoded = ServerCodec.encode_player_game_state(
-        player_view, sequence_number=42
-    )
+    encoded = ServerCodec.encode_player_game_state(player_view, sequence_number=42)
 
     message_type = ClientCodec.peek_udp_msg_type(encoded)
 

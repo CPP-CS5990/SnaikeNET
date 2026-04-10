@@ -241,7 +241,9 @@ async def game_loop(
 
             player_states_time = time.perf_counter()
             player_states = game.get_player_states()
-            logger.debug(f"player_states: {(time.perf_counter() - player_states_time) * 1000:.3f}ms\n")
+            logger.debug(
+                f"player_states: {(time.perf_counter() - player_states_time) * 1000:.3f}ms\n"
+            )
             await server.broadcast_game_state_frames(player_states, tick_index)
 
             tick_times.append(time.perf_counter() - tick_start_time)
@@ -252,7 +254,9 @@ async def game_loop(
             if sleep_duration > 0.0:
                 await asyncio.sleep(sleep_duration)
             else:
-                logger.warning(f"Tick {tick_index} overran by {-sleep_duration * 1000:.2f}ms\n")
+                logger.warning(
+                    f"Tick {tick_index} overran by {-sleep_duration * 1000:.2f}ms\n"
+                )
 
             if tick_index % 100 == 0:
                 avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000

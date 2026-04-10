@@ -94,10 +94,10 @@ class Grid:
     # is still needed to structure the actual datagram, but it makes more sense to
     # encode the grid as bytes here.
     def viewport_as_bytes(
-            self,
-            center_position: tuple[int, int],
-            distance_from_center: tuple[int, int],
-            player_id: str
+        self,
+        center_position: tuple[int, int],
+        distance_from_center: tuple[int, int],
+        player_id: str,
     ) -> bytes:
         width = distance_from_center[0] * 2 + 1
         height = distance_from_center[1] * 2 + 1

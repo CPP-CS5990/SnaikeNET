@@ -50,7 +50,9 @@ class UdpMsgType(Enum):
     # Unpacking the additional header fields (not including the message type) from the data
     def unpack_from(self, data: bytes) -> tuple:
         if self.additional_header_fmt is None:
-            logger.warning(f"Trying to unpack additional header for message type {self.name} which has no additional header")
+            logger.warning(
+                f"Trying to unpack additional header for message type {self.name} which has no additional header"
+            )
             raise ValueError(f"Additional header not set")
         return struct.unpack_from(
             self.additional_header_fmt, data, _HEADER_MSG_TYPE_SIZE

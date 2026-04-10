@@ -93,7 +93,9 @@ class SnaikenetServer:
                 for uuid, frame in client_frames.items()
             )
         )
-        logger.debug(f"{(time.perf_counter() - start_broadcast_time) * 1000:.3f}ms to broadcast game state frames to all clients")
+        logger.debug(
+            f"{(time.perf_counter() - start_broadcast_time) * 1000:.3f}ms to broadcast game state frames to all clients"
+        )
 
     async def _broadcast_game_state_frame(
         self, client_id: str, client_frame: PlayerView, sequence_number: int
