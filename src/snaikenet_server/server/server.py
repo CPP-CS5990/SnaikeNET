@@ -105,7 +105,6 @@ class SnaikenetServer:
         if dest is not None:
             encoded = await asyncio.to_thread(
                 ServerCodec.encode_player_game_state,
-                client_id,
                 client_frame,
                 sequence_number,
             )

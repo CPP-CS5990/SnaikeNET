@@ -239,7 +239,9 @@ async def game_loop(
             tick_ms = (time.perf_counter() - tick_start_time) * 1000
             logger.debug("game.tick(): {:.3f}ms", tick_ms)
 
+            player_states_time = time.perf_counter()
             player_states = game.get_player_states()
+            logger.debug(f"player_states: {(time.perf_counter() - player_states_time) * 1000:.3f}ms\n")
             await server.broadcast_game_state_frames(player_states, tick_index)
 
             tick_times.append(time.perf_counter() - tick_start_time)

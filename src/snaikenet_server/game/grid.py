@@ -1,6 +1,3 @@
-import os
-import time
-from concurrent.futures import ThreadPoolExecutor
 from enum import IntEnum
 
 from loguru import logger
@@ -92,29 +89,35 @@ class Grid:
             for tile in row:
                 yield tile
 
-    # Gets a viewport of the grid centered around a given position
-    # When viewport goes out of bounds, it should fill the remaining tiles with TileType.WALL
-    def get_viewport(
-        self, center_position: Position, distance_from_center: tuple[int, int]
-    ) -> GridStructure:
-        viewport = []
-        for x in range(
-            center_position[0] - distance_from_center[0],
-            center_position[0] + distance_from_center[0] + 1,
-        ):
-            row = []
-            for y in range(
-                center_position[1] - distance_from_center[1],
-                center_position[1] + distance_from_center[1] + 1,
-            ):
+    # We would usually want to have the ServerCodec do this but that is alot of
+    # meaningless extra work we would be imposing on the server. The ServerCodec
+    # is still needed to structure the actual datagram, but it makes more sense to
+    # encode the grid as bytes here.
+    def viewport_as_bytes(
+            self,
+            center_position: tuple[int, int],
+            distance_from_center: tuple[int, int],
+            player_id: str
+    ) -> bytes:
+        width = distance_from_center[0] * 2 + 1
+        height = distance_from_center[1] * 2 + 1
+        start_x = center_position[0] - distance_from_center[0]
+        end_x = center_position[0] + distance_from_center[0]
+        start_y = center_position[1] - distance_from_center[1]
+        end_y = center_position[1] + distance_from_center[1]
+        viewport = bytearray(width * height)
+        offset = 0
+        for x in range(start_x, end_x + 1):
+            for y in range(start_y, end_y + 1):
+                # if tile is within the bounds
                 if 0 <= x < self._grid_size[0] and 0 <= y < self._grid_size[1]:
                     tile = self._grid[x][y]
-                    row.append(TileData(tile_type=tile.tile_type, player_ids=tile.player_ids.copy()))
+                    viewport[offset] = tile.tile_type
+                    if tile.tile_type == TileType.SNAKE:
+                        viewport[offset] = 3 if player_id in tile.player_ids else 4
                 else:
-                    wall_tile = TileData(tile_type=TileType.WALL)
-                    row.append(wall_tile)
-            viewport.append(row)
-        return viewport
+                    viewport[offset] = TileType.WALL
+        return bytes(viewport)
 
 
 class TileType(IntEnum):

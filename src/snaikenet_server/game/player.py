@@ -124,6 +124,9 @@ class SnakePlayer:
             segment = segment.prev_segment
         return False
 
+    def get_player_id(self) -> PlayerID:
+        return self._player_id
+
     def __iter__(self) -> Iterator[Position]:
         current = self._tail
         while current is not None:

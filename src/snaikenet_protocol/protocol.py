@@ -1,17 +1,15 @@
-from enum import Enum
-
-from snaikenet_server.game.game_state import PlayerView
-from snaikenet_server.game.grid import TileType
-from snaikenet_server.game.types import Direction
-from snaikenet_client.types import ClientTileType, ClientGridStructure, ClientDirection
-import struct
 import json
+import struct
 import time
 import zlib
+from enum import Enum
 
 from loguru import logger
 
 from snaikenet_client.client_data import ClientGameStateFrame
+from snaikenet_client.types import ClientTileType, ClientGridStructure, ClientDirection
+from snaikenet_server.game.game_state import PlayerView
+from snaikenet_server.game.types import Direction
 
 
 def _to_json(data: dict) -> bytes:
@@ -107,7 +105,7 @@ class ServerCodec:
 
     @staticmethod
     def encode_player_game_state(
-        player_id: str, player_view: PlayerView, sequence_number: int
+        player_view: PlayerView, sequence_number: int
     ) -> bytes:
         header_size = UdpMsgType.GAME_STATE_FRAME_UPDATE.full_size
         header = bytearray(header_size)
@@ -124,28 +122,14 @@ class ServerCodec:
             1 if player_view.is_spectating else 0,
         )
 
-        t_grid = time.perf_counter()
-        grid_bytes = bytearray(
-            player_view.viewport_size[0] * player_view.viewport_size[1]
-        )
-        offset = 0
-        for row in player_view.viewport:
-            for tile in row:
-                grid_bytes[offset] = tile.tile_type
-                if tile.tile_type == TileType.SNAKE:
-                    grid_bytes[offset] = ClientTileType.SNAKE if player_id in tile.player_ids else ClientTileType.OTHER_SNAKE
-                offset += 1
-        grid_ms = (time.perf_counter() - t_grid) * 1000
-        logger.debug("grid serialization: {:.3f}ms", grid_ms)
-
         t0 = time.perf_counter()
-        compressed_grid = zlib.compress(bytes(grid_bytes))
+        compressed_grid = zlib.compress(bytes(player_view.viewport))
         compress_ms = (time.perf_counter() - t0) * 1000
         logger.debug(
             "zlib compress: {}B -> {}B ({:.1f}%) in {:.3f}ms",
-            len(grid_bytes),
+            len(player_view.viewport),
             len(compressed_grid),
-            len(compressed_grid) / len(grid_bytes) * 100,
+            len(compressed_grid) / len(player_view.viewport) * 100,
             compress_ms,
         )
         return bytes(header) + compressed_grid
