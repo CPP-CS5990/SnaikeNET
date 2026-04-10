@@ -241,9 +241,10 @@ async def game_loop(
 
             player_states = game.get_player_states()
             await server.broadcast_game_state_frames(player_states, tick_index)
-            tick_times.append(time.perf_counter() - tick_start_time)
 
+            tick_times.append(time.perf_counter() - tick_start_time)
             next_tick_time += tick_interval
+
             sleep_duration = next_tick_time - time.perf_counter()
 
             if sleep_duration > 0.0:

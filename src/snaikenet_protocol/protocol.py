@@ -131,15 +131,9 @@ class ServerCodec:
         offset = 0
         for row in player_view.viewport:
             for tile in row:
-                match tile.tile_type:
-                    case TileType.EMPTY, TileType.WALL, TileType.FOOD:
-                        grid_bytes[offset] = 0
-                    case TileType.WALL:
-                        grid_bytes[offset] = 1
-                    case TileType.FOOD:
-                        grid_bytes[offset] = 2
-                    case TileType.SNAKE:
-                        grid_bytes[offset] = 3 if player_id in tile.player_ids else 4
+                grid_bytes[offset] = tile.tile_type
+                if tile.tile_type == TileType.SNAKE:
+                    grid_bytes[offset] = ClientTileType.SNAKE if player_id in tile.player_ids else ClientTileType.OTHER_SNAKE
                 offset += 1
         grid_ms = (time.perf_counter() - t_grid) * 1000
         logger.debug("grid serialization: {:.3f}ms", grid_ms)

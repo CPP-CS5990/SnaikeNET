@@ -1,3 +1,6 @@
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 from enum import IntEnum
 
 from loguru import logger
@@ -105,7 +108,8 @@ class Grid:
                 center_position[1] + distance_from_center[1] + 1,
             ):
                 if 0 <= x < self._grid_size[0] and 0 <= y < self._grid_size[1]:
-                    row.append(self._grid[x][y])
+                    tile = self._grid[x][y]
+                    row.append(TileData(tile_type=tile.tile_type, player_ids=tile.player_ids.copy()))
                 else:
                     wall_tile = TileData(tile_type=TileType.WALL)
                     row.append(wall_tile)
@@ -121,10 +125,10 @@ class TileType(IntEnum):
 
 
 class TileData:
-    def __init__(self, tile_type: TileType = TileType.EMPTY, player_ids=None):
+    def __init__(self, tile_type: int = TileType.EMPTY, player_ids=None):
         if player_ids is None:
             player_ids = []
-        self.tile_type: TileType = tile_type
+        self.tile_type: int = tile_type
         # Multiple players can occupy the same tile temporarily during collisions
         self.player_ids: list[PlayerID] = player_ids
 

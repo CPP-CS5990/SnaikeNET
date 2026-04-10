@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from uuid import uuid4
 
 from loguru import logger
@@ -85,12 +86,14 @@ class SnaikenetServer:
     async def broadcast_game_state_frames(
         self, client_frames: dict[str, PlayerView], sequence_number: int
     ):
+        start_broadcast_time = time.perf_counter()
         await asyncio.gather(
             *(
                 self._broadcast_game_state_frame(uuid, frame, sequence_number)
                 for uuid, frame in client_frames.items()
             )
         )
+        logger.debug(f"{(time.perf_counter() - start_broadcast_time) * 1000:.3f}ms to broadcast game state frames to all clients")
 
     async def _broadcast_game_state_frame(
         self, client_id: str, client_frame: PlayerView, sequence_number: int
