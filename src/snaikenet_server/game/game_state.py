@@ -1,10 +1,11 @@
+import math
 import random
 import uuid
 
 import numpy as np
 from loguru import logger
 
-from snaikenet_server.game.grid import Grid, TileData, GridStructure
+from snaikenet_server.game.grid import Grid, TileData
 from snaikenet_server.game.player import SnakePlayer
 from snaikenet_server.game.types import PlayerID, GridSize, Position, Direction
 
@@ -204,7 +205,22 @@ class GameState:
 
     def _initialize_food_positions(self):
         self._grid.fill_available_food_positions()
-        self._max_num_food = max(1, len(self._players) * 5)
+        grid_size_x, grid_size_y = self.get_grid_size()
+        # Maximum possible would be half the grid size filled with food
+        self._max_num_food = int(
+            min(
+                max(
+                    1,
+                    (
+                        (grid_size_x * grid_size_y)
+                        * 0.0025
+                        * (math.log(len(self._players)) + 1)
+                    ),
+                ),
+                (grid_size_x * grid_size_y) / 2,
+            )
+        )
+        logger.debug(f"Initialized max number of food with {self._max_num_food}")
         for _ in range(self._max_num_food):
             food_position = self._grid.get_random_available_food_position()
             if food_position is not None:
@@ -263,10 +279,11 @@ class GameState:
             self._players[player_id] = SnakePlayer((x, y), player_id)
             self._grid.add_player_at((x, y), player_id)
 
-    def get_player_viewport(self, player: SnakePlayer) -> GridStructure:
-        return self._grid.get_viewport(
+    def get_player_viewport(self, player: SnakePlayer) -> bytes:
+        return self._grid.viewport_as_bytes(
             player.get_head_position(),
             self._viewport_distance_from_center,
+            player.get_player_id(),
         )
 
     def get_player_states(self) -> dict[PlayerID, PlayerView]:
@@ -355,7 +372,7 @@ class PlayerView:
         length: int,
         kills: int,
         is_alive: bool,
-        viewport: GridStructure,
+        viewport: bytes,
         is_spectating: bool,
     ):
         self.viewport_size = viewport_size

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from uuid import uuid4
 
 from loguru import logger
@@ -82,11 +83,15 @@ class SnaikenetServer:
         for dest in self._connected_clients.get_client_addrs():
             self._udp_transport.sendto(ServerCodec.encode_game_end(), dest)
 
-    def broadcast_game_state_frames(
+    async def broadcast_game_state_frames(
         self, client_frames: dict[str, PlayerView], sequence_number: int
     ):
+        start_broadcast_time = time.perf_counter()
         for uuid, frame in client_frames.items():
             self._broadcast_game_state_frame(uuid, frame, sequence_number)
+        logger.debug(
+            f"{(time.perf_counter() - start_broadcast_time) * 1000:.3f}ms to broadcast game state frames to all clients"
+        )
 
     def _broadcast_game_state_frame(
         self, client_id: str, client_frame: PlayerView, sequence_number: int
@@ -96,12 +101,11 @@ class SnaikenetServer:
             return
         dest = self._connected_clients.get_client_by_id(client_id)
         if dest is not None:
-            self._udp_transport.sendto(
-                ServerCodec.encode_player_game_state(
-                    client_id, client_frame, sequence_number
-                ),
-                dest.get_addr(),
+            encoded = ServerCodec.encode_player_game_state(
+                client_frame,
+                sequence_number,
             )
+            self._udp_transport.sendto(encoded, dest.get_addr())
 
     @staticmethod
     def _log_udp_not_initialized():

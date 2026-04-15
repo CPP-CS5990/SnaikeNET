@@ -1,13 +1,15 @@
+import json
+import struct
+import time
+import zlib
 from enum import Enum
 
-from snaikenet_server.game.game_state import PlayerView
-from snaikenet_server.game.grid import TileType
-from snaikenet_server.game.types import Direction
-from snaikenet_client.types import ClientTileType, ClientGridStructure, ClientDirection
-import struct
-import json
+from loguru import logger
 
 from snaikenet_client.client_data import ClientGameStateFrame
+from snaikenet_client.types import ClientTileType, ClientGridStructure, ClientDirection
+from snaikenet_server.game.game_state import PlayerView
+from snaikenet_server.game.types import Direction
 
 
 def _to_json(data: dict) -> bytes:
@@ -18,9 +20,9 @@ class UdpMsgType(Enum):
     # Additional header formats shouldn't include the order since the header already specifies it, and should be in network byte order (big-endian)
     GAME_STATE_FRAME_UPDATE = (
         0x01,
-        "!IBBHBBB",
+        "!IHHHBBB",
     )  # sequence number, viewport width, viewport height, player length, num kills, is alive. Followed by grid data (1 byte per tile, row-major order)
-    GAME_START = (0x02, "!BB")  # viewport width, viewport height
+    GAME_START = (0x02, "!HH")  # viewport width, viewport height
     GAME_END = (0x03, None)
     GAME_RESTART = (0x04, None)
     GAME_ABOUT_TO_START = (0x05, "!B")  # seconds until start
@@ -47,6 +49,11 @@ class UdpMsgType(Enum):
 
     # Unpacking the additional header fields (not including the message type) from the data
     def unpack_from(self, data: bytes) -> tuple:
+        if self.additional_header_fmt is None:
+            logger.warning(
+                f"Trying to unpack additional header for message type {self.name} which has no additional header"
+            )
+            raise ValueError(f"Additional header not set")
         return struct.unpack_from(
             self.additional_header_fmt, data, _HEADER_MSG_TYPE_SIZE
         )
@@ -100,16 +107,13 @@ class ServerCodec:
 
     @staticmethod
     def encode_player_game_state(
-        player_id: str, player_view: PlayerView, sequence_number: int
+        player_view: PlayerView, sequence_number: int
     ) -> bytes:
         header_size = UdpMsgType.GAME_STATE_FRAME_UPDATE.full_size
-        message_size = (
-            header_size + player_view.viewport_size[0] * player_view.viewport_size[1]
-        )
-        message = bytearray(message_size)
+        header = bytearray(header_size)
 
         UdpMsgType.GAME_STATE_FRAME_UPDATE.pack_into(
-            message,
+            header,
             0,
             sequence_number,
             player_view.viewport_size[0],
@@ -120,22 +124,17 @@ class ServerCodec:
             1 if player_view.is_spectating else 0,
         )
 
-        offset = header_size
-        # Encode the grid structure as a sequence of bytes, where each tile is represented by a single byte
-        for row in player_view.viewport:
-            for tile in row:
-                match tile.tile_type:
-                    case TileType.EMPTY:
-                        message[offset] = 0
-                    case TileType.WALL:
-                        message[offset] = 1
-                    case TileType.FOOD:
-                        message[offset] = 2
-                    case TileType.SNAKE:
-                        message[offset] = 3 if player_id in tile.player_ids else 4
-                offset += 1
-
-        return bytes(message)
+        t0 = time.perf_counter()
+        compressed_grid = zlib.compress(bytes(player_view.viewport))
+        compress_ms = (time.perf_counter() - t0) * 1000
+        logger.debug(
+            "zlib compress: {}B -> {}B ({:.1f}%) in {:.3f}ms",
+            len(player_view.viewport),
+            len(compressed_grid),
+            len(compressed_grid) / len(player_view.viewport) * 100,
+            compress_ms,
+        )
+        return bytes(header) + compressed_grid
 
     @staticmethod
     def encode_game_start(viewport_size: tuple[int, int]) -> bytes:
@@ -190,7 +189,16 @@ class ClientCodec:
             UdpMsgType.GAME_STATE_FRAME_UPDATE.unpack_from(message_bytes)
         )
 
-        grid_bytes = message_bytes[header_size:]
+        compressed_grid = message_bytes[header_size:]
+        t0 = time.perf_counter()
+        grid_bytes = zlib.decompress(compressed_grid)
+        decompress_ms = (time.perf_counter() - t0) * 1000
+        logger.debug(
+            "zlib decompress: {}B -> {}B in {:.3f}ms",
+            len(compressed_grid),
+            len(grid_bytes),
+            decompress_ms,
+        )
 
         grid_data: ClientGridStructure = []
         for i in range(vp_width * vp_height):

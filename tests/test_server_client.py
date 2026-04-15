@@ -5,7 +5,7 @@ from snaikenet_client.client.client_event_handler import SnaikenetClientEventHan
 from snaikenet_client.client_data import ClientGameStateFrame
 from snaikenet_client.types import ClientDirection
 from snaikenet_server.game.game_state import PlayerView
-from snaikenet_server.game.grid import TileData, TileType
+from snaikenet_server.game.grid import TileType
 from snaikenet_server.game.types import Direction
 from snaikenet_server.server.server import SnaikenetServer
 import asyncio
@@ -173,33 +173,31 @@ async def test_server_broadcast():
     await client.start()
     client_id = client.get_client_id()
 
+    assert client_id is not None
+
     # Server broadcasts a message to all clients
     player_view = PlayerView(
         viewport_size=(3, 3),
-        viewport=[
+        viewport=bytes(
             [
-                TileData(TileType.SNAKE),
-                TileData(TileType.EMPTY),
-                TileData(TileType.FOOD),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.SNAKE),
-                TileData(TileType.EMPTY),
-            ],
-            [
-                TileData(TileType.FOOD),
-                TileData(TileType.EMPTY),
-                TileData(TileType.SNAKE),
-            ],
-        ],
+                TileType.SNAKE,
+                TileType.EMPTY,
+                TileType.FOOD,
+                TileType.EMPTY,
+                TileType.SNAKE,
+                TileType.EMPTY,
+                TileType.FOOD,
+                TileType.EMPTY,
+                TileType.SNAKE,
+            ]
+        ),
         kills=0,
         is_alive=True,
         length=1,
         is_spectating=False,
     )
 
-    server.broadcast_game_state_frames({client_id: player_view}, 0)
+    await server.broadcast_game_state_frames({client_id: player_view}, 0)
 
     broadcast = await event_handler.wait_for_broadcast()
     event_handler.reset_future()
@@ -210,7 +208,7 @@ async def test_server_broadcast():
 
     player_view.is_alive = False
 
-    server.broadcast_game_state_frames({client_id: player_view}, 1)
+    await server.broadcast_game_state_frames({client_id: player_view}, 1)
     broadcast = await event_handler.wait_for_broadcast()
     event_handler.reset_future()
 
