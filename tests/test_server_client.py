@@ -173,6 +173,8 @@ async def test_server_broadcast():
     await client.start()
     client_id = client.get_client_id()
 
+    assert client_id is not None
+
     # Server broadcasts a message to all clients
     player_view = PlayerView(
         viewport_size=(3, 3),
