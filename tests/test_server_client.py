@@ -5,7 +5,7 @@ from snaikenet_client.client.client_event_handler import SnaikenetClientEventHan
 from snaikenet_client.client_data import ClientGameStateFrame
 from snaikenet_client.types import ClientDirection
 from snaikenet_server.game.game_state import PlayerView
-from snaikenet_server.game.grid import TileData, TileType
+from snaikenet_server.game.grid import TileType
 from snaikenet_server.game.types import Direction
 from snaikenet_server.server.server import SnaikenetServer
 import asyncio
@@ -176,23 +176,19 @@ async def test_server_broadcast():
     # Server broadcasts a message to all clients
     player_view = PlayerView(
         viewport_size=(3, 3),
-        viewport=[
+        viewport=bytes(
             [
-                TileData(TileType.SNAKE),
-                TileData(TileType.EMPTY),
-                TileData(TileType.FOOD),
-            ],
-            [
-                TileData(TileType.EMPTY),
-                TileData(TileType.SNAKE),
-                TileData(TileType.EMPTY),
-            ],
-            [
-                TileData(TileType.FOOD),
-                TileData(TileType.EMPTY),
-                TileData(TileType.SNAKE),
-            ],
-        ],
+                TileType.SNAKE,
+                TileType.EMPTY,
+                TileType.FOOD,
+                TileType.EMPTY,
+                TileType.SNAKE,
+                TileType.EMPTY,
+                TileType.FOOD,
+                TileType.EMPTY,
+                TileType.SNAKE,
+            ]
+        ),
         kills=0,
         is_alive=True,
         length=1,
