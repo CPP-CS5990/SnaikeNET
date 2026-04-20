@@ -2,12 +2,6 @@ from snaikenet_client.types import ClientGridStructure
 
 
 class ClientGameStateFrame:
-    sequence_number: int
-    player_length: int
-    num_kills: int
-    is_alive: bool
-    grid_data: ClientGridStructure
-
     def __init__(
         self,
         sequence_number: int,
