@@ -23,7 +23,8 @@ server = "snaikenet_server.__main__:run_main"
 visualize_gamestate = "snaikenet_server.game.visualize_gamestate:main"
 prototype = "snaikenet_server.game.prototype_game:main"
 pygame_client_demo = "snaikenet_demos.pygame_client_demo:main"
-rl-agent = "snaikenet_rl.__main__:main"
+rl-agent-devaansh = "snaikenet_rl_devaansh.__main__:main"
+rl-agent-ameer = "snaikenet_rl_ameer.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
