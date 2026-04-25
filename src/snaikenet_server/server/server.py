@@ -1,5 +1,8 @@
 import asyncio
+import ctypes
 import json
+import socket
+import sys
 import time
 from uuid import uuid4
 
@@ -13,6 +16,28 @@ from snaikenet_server.server.server_event_handler import (
     DefaultSnaikenetServerEventHandler,
 )
 
+SIO_UDP_CONNRESET = 0x9800000C
+
+def _disable_udp_connreset(sock: socket.socket):
+    """Disable SIO_UDP_CONNRESET via WSAIoctl (sock.ioctl rejects this command on newer Python)."""
+    ws2_32 = ctypes.WinDLL('ws2_32', use_last_error=True)
+    enable = ctypes.c_ulong(0)
+    bytes_returned = ctypes.c_ulong(0)
+
+    result = ws2_32.WSAIoctl(
+        sock.fileno(),
+        SIO_UDP_CONNRESET,
+        ctypes.byref(enable),
+        ctypes.sizeof(enable),
+        None,
+        0,
+        ctypes.byref(bytes_returned),
+        None,
+        None,
+    )
+    if result != 0:
+        err = ctypes.get_last_error()
+        raise OSError(f"WSAIoctl(SIO_UDP_CONNRESET) failed: WinError {err}")
 
 class SnaikenetServer:
     """
@@ -261,46 +286,62 @@ class SnaikenetServer:
         def connection_made(self, transport: asyncio.DatagramTransport):
             self._server._udp_transport = transport
 
+            # fixes Windows specific bug that caused the socket to stop reading
+            # whenever it got a SIO_UDP_CONNRESET request that can be induced from the client
+            if sys.platform == "win32":
+                _disable_udp_connreset(transport.get_extra_info("socket"))
+
+        def error_received(self, exc: Exception):
+            logger.warning(f"UDP transport error (ignored): {exc}")
+
         def datagram_received(self, data: bytes, addr: tuple[str, int]):
-            msg = data.decode().strip()
-            msg_json = json.loads(msg)
-
-            msg_type = msg_json.get("type")
-
-            if msg_type == "hole_punch":
-                client_id = msg_json.get("uuid")
-                # Hole-punch ping
-                if client_id in self._server._pending_clients:
-                    logger.info(
-                        f"Received hole punch ping from {addr} for client {client_id}"
-                    )
-                    fut = self._server._pending_clients.pop(client_id)
-                    if not fut.done():
-                        fut.set_result(addr)
-                    return
-                elif self._server._connected_clients.has_client_id(client_id):
-                    logger.debug(
-                        f"Received hole punch for existing client {client_id} from {addr}. Ignoring since client is already registered."
-                    )
-                    return
-            elif msg_type == "direction":
+            try:
                 try:
-                    client = self._server._connected_clients.get_client_by_addr(addr)
-                    if client is None:
-                        raise ValueError(f"No registered client with address {addr}")
-                    self._server._connected_clients.touch_client_by_id(client.get_id())
-                    decoded_direction = ServerCodec.decode_direction(data)
-                    if decoded_direction is None:
-                        raise ValueError(
-                            f"Invalid direction message from {addr}: {msg}"
+                    msg = data.decode().strip()
+                    msg_json = json.loads(msg)
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    logger.warning(f"Ignoring non-JSON UDP packet from {addr}")
+                    return
+
+                msg_type = msg_json.get("type")
+
+                if msg_type == "hole_punch":
+                    client_id = msg_json.get("uuid")
+                    # Hole-punch ping
+                    if client_id in self._server._pending_clients:
+                        logger.info(
+                            f"Received hole punch ping from {addr} for client {client_id}"
                         )
-                    self._server._event_handler.on_receive_direction(
-                        client.get_id(), decoded_direction
-                    )
-                except ValueError as e:
-                    logger.debug(e)
-            elif msg_type == "heartbeat":
-                self._server._connected_clients.touch_client_by_addr(addr)
+                        fut = self._server._pending_clients.pop(client_id)
+                        if not fut.done():
+                            fut.set_result(addr)
+                        return
+                    elif self._server._connected_clients.has_client_id(client_id):
+                        logger.debug(
+                            f"Received hole punch for existing client {client_id} from {addr}. Ignoring since client is already registered."
+                        )
+                        return
+                elif msg_type == "direction":
+                    try:
+                        client = self._server._connected_clients.get_client_by_addr(addr)
+                        if client is None:
+                            raise ValueError(f"No registered client with address {addr}")
+                        self._server._connected_clients.touch_client_by_id(client.get_id())
+                        decoded_direction = ServerCodec.decode_direction(data)
+                        if decoded_direction is None:
+                            raise ValueError(
+                                f"Invalid direction message from {addr}: {msg}"
+                            )
+                        self._server._event_handler.on_receive_direction(
+                            client.get_id(), decoded_direction
+                        )
+                    except ValueError as e:
+                        logger.debug(e)
+                elif msg_type == "heartbeat":
+                    self._server._connected_clients.touch_client_by_addr(addr)
+
+            except Exception as e:
+                logger.warning(f"UDP transport error (ignored): {e}")
 
     def broadcast_game_about_to_start(self, seconds_until_start: int):
         if self._udp_transport is None:
