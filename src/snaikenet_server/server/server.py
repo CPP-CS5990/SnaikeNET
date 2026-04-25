@@ -18,9 +18,10 @@ from snaikenet_server.server.server_event_handler import (
 
 SIO_UDP_CONNRESET = 0x9800000C
 
+
 def _disable_udp_connreset(sock: socket.socket):
     """Disable SIO_UDP_CONNRESET via WSAIoctl (sock.ioctl rejects this command on newer Python)."""
-    ws2_32 = ctypes.WinDLL('ws2_32', use_last_error=True)
+    ws2_32 = ctypes.WinDLL("ws2_32", use_last_error=True)
     enable = ctypes.c_ulong(0)
     bytes_returned = ctypes.c_ulong(0)
 
@@ -38,6 +39,7 @@ def _disable_udp_connreset(sock: socket.socket):
     if result != 0:
         err = ctypes.get_last_error()
         raise OSError(f"WSAIoctl(SIO_UDP_CONNRESET) failed: WinError {err}")
+
 
 class SnaikenetServer:
     """
@@ -299,7 +301,7 @@ class SnaikenetServer:
                 try:
                     msg = data.decode().strip()
                     msg_json = json.loads(msg)
-                except (UnicodeDecodeError, json.JSONDecodeError):
+                except UnicodeDecodeError, json.JSONDecodeError:
                     logger.warning(f"Ignoring non-JSON UDP packet from {addr}")
                     return
 
@@ -323,10 +325,16 @@ class SnaikenetServer:
                         return
                 elif msg_type == "direction":
                     try:
-                        client = self._server._connected_clients.get_client_by_addr(addr)
+                        client = self._server._connected_clients.get_client_by_addr(
+                            addr
+                        )
                         if client is None:
-                            raise ValueError(f"No registered client with address {addr}")
-                        self._server._connected_clients.touch_client_by_id(client.get_id())
+                            raise ValueError(
+                                f"No registered client with address {addr}"
+                            )
+                        self._server._connected_clients.touch_client_by_id(
+                            client.get_id()
+                        )
                         decoded_direction = ServerCodec.decode_direction(data)
                         if decoded_direction is None:
                             raise ValueError(
