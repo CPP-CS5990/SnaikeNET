@@ -1,3 +1,15 @@
+"""
+Entry point for the PPO RL agent:
+
+Threading model (mirrors pygame_client_demo):
+    - Network thread: runs asyncio event loop, receives game frames, sends direction
+    - Main thread: owns the PPOAgentEventHandler and the training loop
+
+Checkpointing:
+    - Model weights are saved to 'checkpoint/ppo_agent.pt' every SAVE_EVERY updates
+    - On startup, the latest checkpoint is loaded if it exists
+"""
+
 import asyncio
 import queue
 import selectors
@@ -16,7 +28,7 @@ from snaikenet_client.types import ClientDirection
 from snaikenet_rl_devaansh.agent import PPOAgentEventHandler
 
 CHECKPOINT_PATH = Path("checkpoint/ppo_agent.ppo")
-SAVE_EVERY = 10
+SAVE_EVERY = 10     # save checkpoint every N PPO updates
 
 def setup_logger(verbose: bool):
     logger.remove()
@@ -57,6 +69,7 @@ async def run_client(
     await client.start(client_uuid)
     logger.info("RL agent connected to server")
 
+    # wire up the direction sender so the handler can call it
     handler.send_direction = client.set_direction
 
     while True:

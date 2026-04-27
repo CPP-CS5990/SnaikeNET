@@ -10,15 +10,24 @@ from snaikenet_rl_devaansh.rollout_buffer import RolloutBuffer
 from snaikenet_rl_devaansh.ppo import PPO
 from snaikenet_rl_devaansh.reward import compute_reward
 
-N_FRAMES     = 2
-ROLLOUT_SIZE = 512
+N_FRAMES     = 2        # number of frames to stack
+ROLLOUT_SIZE = 512      # steps collected before each PPO update
 ACTION_MAP   = [ClientDirection.NORTH, ClientDirection.SOUTH,
                 ClientDirection.EAST,  ClientDirection.WEST]
 
 
 class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
+    """
+    Connects the game client event loop to the PPO training pipeline
+
+    - on_game_start         : initialise frame stacker (viewport size known here)
+    - one_game_state_update : core step - preprocess --> act --> store --> maybe train
+    - on_game_restart       : mark episode boundary; keep buffer + networks intact
+    - on_game_end           : same as restart
+    """
 
     def __init__(self):
+        # Networks and PPO trainer - created once, never reset
         self.network: ActorCritic | None = None
         self.ppo: PPO | None = None
         self.buffer = RolloutBuffer(capacity=ROLLOUT_SIZE)
@@ -30,27 +39,32 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
         self._prev_log_prob: float | None = None
         self._prev_value: float | None = None
 
-        self.send_direction = None
+        # Callback set by __main__ so the handler can send directions to the server
+        self.send_direction = None   # type: ignore[assignment]
 
     def on_game_start(self, viewport_size: tuple[int, int]):
         in_channels = NUM_TILE_TYPES * N_FRAMES  # 5 * 2 = 10
 
         if self.network is None:
+            # First game - create networks
             self.network = ActorCritic(in_channels=in_channels)
             self.ppo = PPO(self.network)
 
+        # Reset episode-level state (not the network buffer)
         self._prev_frame = None
         self._prev_state = None
 
     def on_game_state_update(self, frame: ClientGameStateFrame):
         if self.network is None:
-            return
+            return      # not initialized yet
 
+        # 1. preprocess current frame
         if self._prev_state is None:
             curr_state = self.stacker.reset(frame)
         else:
             curr_state = self.stacker.step(frame)
 
+        # 2. Store transition from the PREVIOUS step into the buffer
         if self._prev_frame is not None:
             reward = compute_reward(self._prev_frame, frame)
             done = not frame.is_alive
@@ -64,12 +78,14 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
                 done     = done,
             )
 
+            # If buffer is full, run a PPO update
             if self.buffer.is_full():
                 with torch.no_grad():
                     _, last_value = self.network.forward(curr_state.unsqueeze(0))
                 last_val = last_value.item() if frame.is_alive else 0.0
                 self.ppo.update(self.buffer, last_value=last_val)
 
+        # 3. Select action for the current state
         if frame.is_alive:
             with torch.no_grad():
                 action, log_prob, _, value = self.network.get_action_and_value(
@@ -82,8 +98,10 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
             if self.send_direction is not None:
                 self.send_direction(ACTION_MAP[action_idx])
         else:
+            # Dead this tick - pick a placeholder; won't be acted on
             action_idx, log_prob_val, value_val = 0, 0.0, 0.0
 
+        # 4. Cache for next step
         self._prev_frame    = frame
         self._prev_state    = curr_state
         self._prev_action   = action_idx
@@ -91,6 +109,7 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
         self._prev_value    = value_val
 
     def on_game_restart(self):
+        # New episode begins - reset episode state but keep buffer + networks
         self._prev_frame = None
         self._prev_state = None
 

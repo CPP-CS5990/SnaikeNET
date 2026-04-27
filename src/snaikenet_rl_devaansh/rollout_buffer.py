@@ -2,6 +2,13 @@ import torch
 
 class RolloutBuffer:
 
+    """
+    Stores a fixed-length trajectory of experience for PPO updates.
+
+    Collects 'capacity' steps (across however many episodes/deaths),
+    then computes advantages via GAE and exposes mini-batches for training.
+    """
+
     def __init__(self, capacity: int = 512, gamma: float = 0.99, gae_lambda: float = 0.95):
         self.capacity = capacity
         self.gamma = gamma
@@ -9,6 +16,7 @@ class RolloutBuffer:
         self._ptr = 0
         self._full = False
 
+        # Pre-allocated as plain lists; converted to tensors before training
         self.states: list[torch.Tensor] = []
         self.actions: list[int] = []
         self.log_probs: list[float] = []
@@ -33,6 +41,7 @@ class RolloutBuffer:
             self.values.append(value)
             self.dones.append(done)
         else:
+            # Overwrite oldest entry (entry buffer)
             idx = self._ptr % self.capacity
             self.states[idx] = state
             self.actions[idx] = action
@@ -47,6 +56,17 @@ class RolloutBuffer:
         return self._ptr >= self.capacity
 
     def compute_advantages(self, last_value: float) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute GAE advantages and discounted returns.
+
+        Args:
+            last_value: Critic's value estimate for the state AFTER the last stored step
+                        Pass 0.0 if the last step was terminal (done = true)
+
+        Returns:
+            advantages: (capacity,) tensor
+            returns:    (capacity,) tensor     (used as critic targets)
+        """
         advantages = torch.zeros(self.capacity)
         gae = 0.0
 
@@ -62,6 +82,9 @@ class RolloutBuffer:
         return advantages, returns
 
     def get_tensors(self) -> dict[str, torch.Tensor]:
+        """
+        Convert stored lists to stacked tensors for training
+        """
         return{
             "states": torch.stack(self.states),
             "actions": torch.tensor(self.actions, dtype = torch.long),
