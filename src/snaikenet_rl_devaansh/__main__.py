@@ -30,7 +30,7 @@ def save_checkpoint(handler: PPOAgentEventHandler, update_count: int):
         {
             "network": handler.network.state_dict(),
             "update_count": update_count,
-        },
+        }, CHECKPOINT_PATH
     )
     logger.info(f"Checkpoint saved at update {update_count}")
 
