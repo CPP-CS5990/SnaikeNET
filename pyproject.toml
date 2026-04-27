@@ -25,6 +25,8 @@ prototype = "snaikenet_server.game.prototype_game:main"
 pygame_client_demo = "snaikenet_demos.pygame_client_demo:main"
 rl-agent-devaansh = "snaikenet_rl_devaansh.__main__:main"
 rl-agent-ameer = "snaikenet_rl_ameer.__main__:main"
+rl-agent-jack = "snaikenet_rl_jack.__main__:main"
+
 
 [tool.setuptools.packages.find]
 where = ["src"]
