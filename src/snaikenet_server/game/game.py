@@ -233,23 +233,11 @@ async def game_loop(
     host: str,
     tcp_port: int,
     udp_port: int,
+    renderer_queue: queue.Queue[RendererEvent],
     clean_idle_clients: bool = True,
     client_timeout_seconds: float = 20,
     headless: bool = True,
 ):
-    renderer_queue: queue.Queue[RendererEvent] | None = None
-    if not headless:
-        logger.info(
-            "Detected not running in headless: Starting pygame renderer thread..."
-        )
-        from snaikenet_server.game import pygame_renderer
-
-        renderer_queue = queue.Queue()
-        threading.Thread(
-            target=pygame_renderer.render_loop,
-            args=(renderer_queue,),
-            daemon=True,
-        ).start()
 
     server = SnaikenetServer(
         host=host,
@@ -284,7 +272,7 @@ async def game_loop(
                 f"player_states: {(time.perf_counter() - player_states_time) * 1000:.3f}ms\n"
             )
             await server.broadcast_game_state_frames(player_states, tick_index)
-            if renderer_queue is not None:
+            if not headless:
                 renderer_queue.put_nowait(
                     RendererEvent(kind="frame", grid_data=game.get_grid_data())
                 )
