@@ -13,7 +13,7 @@ from snaikenet_client.client_data import ClientGameStateFrame
 from snaikenet_client.parse_args import parse_client_args
 from snaikenet_client.types import ClientDirection
 
-from snaikenet_rl_devaansh.agent_reference import PPOAgentEventHandler
+from snaikenet_rl_devaansh.agent import PPOAgentEventHandler
 
 CHECKPOINT_PATH = Path("checkpoint/ppo_agent.ppo")
 SAVE_EVERY = 10
@@ -85,7 +85,8 @@ def main():
 
     net_thread = threading.Thread(
         target = start_network_thread,
-        args = (handler, direction_queue, args.host, args.port, args.reconnect_uuid)
+        args = (handler, direction_queue, args.host, args.port, args.reconnect_uuid),
+        daemon = True,
     )
     net_thread.start()
 
