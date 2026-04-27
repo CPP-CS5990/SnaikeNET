@@ -291,6 +291,9 @@ class SnaikenetServer:
             # fixes Windows specific bug that caused the socket to stop reading
             # whenever it got a SIO_UDP_CONNRESET request that can be induced from the client
             if sys.platform == "win32":
+                logger.info(
+                    "Disabling SIO_UDP_CONNRESET on Windows UDP socket to prevent it from being disabled by certain UDP packets from clients"
+                )
                 _disable_udp_connreset(transport.get_extra_info("socket"))
 
         def error_received(self, exc: Exception):
