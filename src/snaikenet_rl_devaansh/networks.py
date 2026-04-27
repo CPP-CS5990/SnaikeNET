@@ -34,9 +34,9 @@ class ActorCritic(nn.Module):
             self, x: torch.Tensor, action: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         logits, value = self.forward(x)
-        dist = torch.distribution.Categorical(logits=logits)
+        dist = torch.distributions.Categorical(logits=logits)
 
-        if action is not None:
+        if action is None:
             action = dist.sample()
 
         log_prob = dist.log_prob(action)
