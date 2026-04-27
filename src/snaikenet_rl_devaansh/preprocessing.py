@@ -23,16 +23,16 @@ def frame_to_tensor(frame: ClientGameStateFrame) -> torch.Tensor:
 class FrameStacker:
     def __init__(self, n_frames: int = 2):
         self.n_frames = n_frames
-        self.frames: list[torch.Tensor] =  []
+        self._frames: list[torch.Tensor] =  []
 
     def reset(self, first_frame: ClientGameStateFrame) -> torch.Tensor:
         t = frame_to_tensor(first_frame)
         self._frames = [t] * self.n_frames
-        return self._getstacked()
+        return self._get_stacked()
 
     def step(self, frame: ClientGameStateFrame) -> torch.Tensor:
         self._frames.append(frame_to_tensor(frame))
-        if len(self._frames) == self.n_frames:
+        if len(self._frames) > self.n_frames:
             self._frames.pop(0)
         return self._get_stacked()
 
