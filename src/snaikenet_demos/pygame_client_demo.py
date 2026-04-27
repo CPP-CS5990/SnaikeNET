@@ -141,6 +141,11 @@ def render_frame(
     for x, col in enumerate(grid):
         for y, tile in enumerate(col):
             color = COLORS.get(tile, (0, 0, 0))
+            # check if spectator
+            if frame.is_spectating:
+                # if spectator, make other snakes a different color
+                if tile == ClientTileType.SNAKE:
+                    color = COLORS[ClientTileType.OTHER_SNAKE]
             rect = pygame.Rect(
                 grid_offset_x + x * tile_size,
                 grid_offset_y + y * tile_size,

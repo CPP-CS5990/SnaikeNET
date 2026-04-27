@@ -93,6 +93,7 @@ async def main():
                 udp_port=args.udp_port,
                 clean_idle_clients=args.clean_idle_clients,
                 client_timeout_seconds=args.client_timeout,
+                headless=args.headless,
             )
         ),
         asyncio.to_thread(console_loop, command_interface),

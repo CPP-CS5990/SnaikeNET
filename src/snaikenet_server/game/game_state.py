@@ -4,6 +4,7 @@ import uuid
 
 import numpy as np
 from loguru import logger
+from numpy.typing import NDArray
 
 from snaikenet_server.game.grid import Grid, TileData
 from snaikenet_server.game.player import SnakePlayer
@@ -185,8 +186,8 @@ class GameState:
     def get_tile_data(self, position: Position) -> TileData:
         return self._grid.get_tile_data(position)
 
-    def get_grid_iterator(self):
-        return iter(self._grid)
+    def get_grid_data(self) -> NDArray[np.uint8]:
+        return self._grid.get_grid_data()
 
     # Run right before the game loop starts to initialize the game state
     # Can't run immediately because the game state is going to depend on
@@ -315,7 +316,12 @@ class GameState:
         death_frame: bool = False,
     ) -> None:
         for spectator_id, spectatee in spectator_map.items():
-            if spectatee is None:
+            # If the spectator doesn't have a spectatee assigned, or their assigned spectatee is invalid (e.g. they were killed), assign them a new spectatee if possible
+            if (
+                spectatee is None
+                or spectatee not in self._players
+                or spectatee in self._dead_players
+            ):
                 # Death frame: send the spectator their own state so they receive
                 # the death notification before switching to spectating.
                 if death_frame:
@@ -349,7 +355,12 @@ class GameState:
                 self._viewport_distance_from_center[1] * 2 + 1,
             ),
             length=len(player),
-            kills=sum(1 for killee in self._kills.values() if killee != player_id),
+            # get kills by counting how many times this player is the killer in the kills dict, excluding self-kills
+            kills=sum(
+                1
+                for killer, killee in self._kills.items()
+                if killee != player_id and killer == player_id
+            ),
             is_alive=not (is_spectating or player.is_dead()),
             viewport=self.get_player_viewport(player),
             is_spectating=is_spectating,
