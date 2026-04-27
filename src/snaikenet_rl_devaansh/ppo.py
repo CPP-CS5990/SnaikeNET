@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from snaikenet_rl_devaansh.networks_reference import ActorCritic
-from snaikenet_rl_devaansh.rollout_buffer_reference import RolloutBuffer
+from snaikenet_rl_devaansh.networks import ActorCritic
+from snaikenet_rl_devaansh.rollout_buffer import RolloutBuffer
 
 class PPO:
 
@@ -21,7 +21,6 @@ class PPO:
         self.clip_eps = clip_eps
         self.n_epochs = n_epochs
         self.batch_size = batch_size
-        self.lr = lr
         self.vf_coef = vf_coef
         self.ent_coef = ent_coef
         self.optimizer = optim.Adam(network.parameters(), lr=lr)
@@ -33,9 +32,9 @@ class PPO:
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         tensors =  buffer.get_tensors()
-        states = tensors['states']
-        actions = tensors['actions']
-        old_log_probs = tensors['old_log_probs']
+        states = tensors["states"]
+        actions = tensors["actions"]
+        old_log_probs = tensors["log_probs"]
 
         n = len(states)
 
