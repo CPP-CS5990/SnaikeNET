@@ -1,6 +1,8 @@
 from enum import IntEnum
 
 from loguru import logger
+import numpy as np
+from numpy.typing import NDArray
 
 from snaikenet_server.game.list_dict import ListDict
 from snaikenet_server.game.types import GridSize, Position, PlayerID
@@ -83,6 +85,11 @@ class Grid:
 
     def get_num_food(self) -> int:
         return self._num_food_tiles
+
+    def get_grid_data(self) -> NDArray[np.uint8]:
+        return np.array(
+            [[tile.tile_type for tile in row] for row in self._grid], dtype=np.uint8
+        )
 
     def __iter__(self):
         for row in self._grid:

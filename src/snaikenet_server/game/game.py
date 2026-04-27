@@ -1,11 +1,13 @@
 import asyncio
 import collections
+import queue
 import threading
 import time
 
 from loguru import logger
 
 from snaikenet_server.game.game_state import GameState, PlayerView
+from snaikenet_server.game.pygame_renderer import RendererEvent
 from snaikenet_server.game.types import PlayerID, GridSize, Direction
 from snaikenet_server.server.server import SnaikenetServer
 from snaikenet_server.server.server_event_handler import SnaikenetServerEventHandler
@@ -19,7 +21,7 @@ class Game:
         viewport_distance_from_center: tuple[int, int] = (14, 14),
     ):
         self._game_lock: threading.Lock = threading.Lock()
-        self._tick_index: int = -1
+        self._tick_index: int = 0
         self._game_state = GameState(grid_size, viewport_distance_from_center)
         self._grid_size = grid_size
         self._viewport_distance_from_center = viewport_distance_from_center
@@ -40,12 +42,12 @@ class Game:
 
     # Returns the tick index
     def tick(self) -> int:
+        tick_start_time = time.perf_counter()
         with self._game_lock:
-            self._game_state.handle_player_moves()
-            self._game_state.handle_collisions()
-            self._game_state.handle_food_spawning()
-            self._tick_index += 1
-            return self._tick_index
+            new_tick = self._tick()
+            tick_ms = (time.perf_counter() - tick_start_time) * 1000
+            logger.debug("game.tick(): {:.3f}ms", tick_ms)
+            return new_tick
 
     def start_game(self):
         if not self._game_state.initialize_game_state():
@@ -67,11 +69,6 @@ class Game:
     # Threadsafe
     def unset_start_event(self):
         self._threadsafe(self._start_event.clear)
-
-    # Wrapper
-    def _threadsafe(self, fn):
-        # noinspection PyTypeChecker
-        self._loop.call_soon_threadsafe(fn)
 
     # Not threadsafe
     def is_running(self) -> bool:
@@ -116,14 +113,8 @@ class Game:
         with self._game_lock:
             self._flush_pending_players()
 
-    def _flush_pending_players(self):
-        for player_id in self._pending_players:
-            logger.info(f"Adding pending player {player_id}")
-            self._add_new_player(player_id)
-        self._pending_players.clear()
-
-    def get_grid_iterator(self):
-        return self._game_state.get_grid_iterator()
+    def get_grid_data(self):
+        return self._game_state.get_grid_data()
 
     def set_player_direction(self, player_id: PlayerID, direction: Direction):
         with self._game_lock:
@@ -141,10 +132,6 @@ class Game:
     def all_players_dead(self) -> bool:
         return self._game_state.all_players_dead()
 
-    # pending and non-pending players (not including spectators)
-    def _get_all_connected_players(self):
-        return self._game_state.get_all_players().union(self._pending_players)
-
     def delete_player(self, player_id: PlayerID):
         with self._game_lock:
             if player_id in self._pending_players:
@@ -157,24 +144,63 @@ class Game:
         with self._game_lock:
             return self._add_new_player(player_id)
 
-    def _add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
-        player_id_ = self._game_state.add_new_player(player_id)
-        logger.info(f"Added new player with ID: {player_id_}")
-        return player_id_
-
     def add_spectator(self, player_id: PlayerID):
         with self._game_lock:
             self._add_spectator(player_id)
-
-    def _add_spectator(self, player_id: PlayerID):
-        self._game_state.add_spectator(player_id)
 
     def add_pending_player(self, player_id: PlayerID):
         with self._game_lock:
             self._add_pending_player(player_id)
 
+    def _tick(self):
+        self._game_state.handle_player_moves()
+        self._game_state.handle_collisions()
+        self._game_state.handle_food_spawning()
+        self._tick_index += 1
+        return self._tick_index
+
+    def _flush_pending_players(self):
+        for player_id in self._pending_players:
+            logger.info(f"Adding pending player {player_id}")
+            self._add_new_player(player_id)
+        self._pending_players.clear()
+
+    # pending and non-pending players (not including spectators)
+    def _get_all_connected_players(self):
+        return self._game_state.get_all_players().union(self._pending_players)
+
+    def _add_new_player(self, player_id: PlayerID | None = None) -> PlayerID:
+        player_id_ = self._game_state.add_new_player(player_id)
+        logger.info(f"Added new player with ID: {player_id_}")
+        return player_id_
+
+    def _add_spectator(self, player_id: PlayerID):
+        self._game_state.add_spectator(player_id)
+
     def _add_pending_player(self, player_id: PlayerID):
         self._pending_players.add(player_id)
+
+    # Wrapper
+    def _threadsafe(self, fn):
+        # noinspection PyTypeChecker
+        self._loop.call_soon_threadsafe(fn)
+
+
+async def handle_sleep(next_tick_time: float):
+    sleep_duration = next_tick_time - time.perf_counter()
+    if sleep_duration > 0.0:
+        await asyncio.sleep(sleep_duration)
+    else:
+        logger.warning(f"Tick overran by {-sleep_duration * 1000:.2f}ms\n")
+
+
+def log_tick_rate(tick_times: collections.deque, tick_index: int, tick_interval: float):
+    if tick_index % 100 == 0 and len(tick_times) > 0:
+        avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
+        real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
+        logger.debug(
+            f"Tick {tick_index} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
+        )
 
 
 class _GameEventHandler(SnaikenetServerEventHandler):
@@ -209,7 +235,22 @@ async def game_loop(
     udp_port: int,
     clean_idle_clients: bool = True,
     client_timeout_seconds: float = 20,
+    headless: bool = True,
 ):
+    renderer_queue: queue.Queue[RendererEvent] | None = None
+    if not headless:
+        logger.info(
+            "Detected not running in headless: Starting pygame renderer thread..."
+        )
+        from snaikenet_server.game import pygame_renderer
+
+        renderer_queue = queue.Queue()
+        threading.Thread(
+            target=pygame_renderer.render_loop,
+            args=(renderer_queue,),
+            daemon=True,
+        ).start()
+
     server = SnaikenetServer(
         host=host,
         tcp_port=tcp_port,
@@ -225,7 +266,7 @@ async def game_loop(
         game.flush_pending_players()
         if not await game.wait_for_game_start():
             continue
-        # Once the game starts, stop accepting new clients
+
         server.broadcast_game_start(game.viewport_size())
         await server.wait_start_game_timer(3)
 
@@ -236,8 +277,6 @@ async def game_loop(
             tick_start_time = time.perf_counter()
 
             tick_index = game.tick()
-            tick_ms = (time.perf_counter() - tick_start_time) * 1000
-            logger.debug("game.tick(): {:.3f}ms", tick_ms)
 
             player_states_time = time.perf_counter()
             player_states = game.get_player_states()
@@ -245,25 +284,17 @@ async def game_loop(
                 f"player_states: {(time.perf_counter() - player_states_time) * 1000:.3f}ms\n"
             )
             await server.broadcast_game_state_frames(player_states, tick_index)
+            if renderer_queue is not None:
+                renderer_queue.put_nowait(
+                    RendererEvent(kind="frame", grid_data=game.get_grid_data())
+                )
 
             tick_times.append(time.perf_counter() - tick_start_time)
             next_tick_time += tick_interval
 
-            sleep_duration = next_tick_time - time.perf_counter()
+            await handle_sleep(next_tick_time)
 
-            if sleep_duration > 0.0:
-                await asyncio.sleep(sleep_duration)
-            else:
-                logger.warning(
-                    f"Tick {tick_index} overran by {-sleep_duration * 1000:.2f}ms\n"
-                )
-
-            if tick_index % 100 == 0:
-                avg_tick_ms = (sum(tick_times) / len(tick_times)) * 1000
-                real_tps = 1.0 / (tick_interval + (sum(tick_times) / len(tick_times)))
-                logger.debug(
-                    f"Tick {tick_index} | avg tick time: {avg_tick_ms:.2f}ms | real TPS: {real_tps:.2f}\n"
-                )
+            log_tick_rate(tick_times, tick_index, tick_interval)
 
             if game.should_restart():
                 logger.debug(
@@ -276,9 +307,12 @@ async def game_loop(
                 await server.wait_start_game_timer(1)
                 tick_times = collections.deque(maxlen=tick_times.maxlen)
                 next_tick_time = time.perf_counter()
+
         logger.info(
             f"No more players left to play game. Waiting for start signal before starting again..."
         )
     logger.info(f"Stopping network servers...")
     await server.stop()
+    if renderer_queue is not None:
+        renderer_queue.put_nowait(RendererEvent(kind="shutdown"))
     logger.info("Game task exiting...")
