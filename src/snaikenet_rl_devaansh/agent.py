@@ -4,11 +4,11 @@ from snaikenet_client.client.client_event_handler import DefaultSnaikenetClientE
 from snaikenet_client.client_data import ClientGameStateFrame
 from snaikenet_client.types import ClientDirection
 
-from snaikenet_rl_devaansh.networks_reference import ActorCritic
-from snaikenet_rl_devaansh.preprocessing_reference import FrameStacker, NUM_TILE_TYPES
-from snaikenet_rl_devaansh.rollout_buffer_reference import RolloutBuffer
-from snaikenet_rl_devaansh.ppo_reference import PPO
-from snaikenet_rl_devaansh.reward_reference import compute_reward
+from snaikenet_rl_devaansh.networks import ActorCritic
+from snaikenet_rl_devaansh.preprocessing import FrameStacker, NUM_TILE_TYPES
+from snaikenet_rl_devaansh.rollout_buffer import RolloutBuffer
+from snaikenet_rl_devaansh.ppo import PPO
+from snaikenet_rl_devaansh.reward import compute_reward
 
 N_FRAMES     = 2
 ROLLOUT_SIZE = 512
