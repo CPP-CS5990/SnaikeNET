@@ -6,6 +6,8 @@
 # Create a command interface for server administration and debugging (allows us to start/stop the game, add/remove players, etc.)
 # - (Later) Create an HTTP server to expose the command interface via a REST API (for remote administration and integration with other services)
 import asyncio
+import queue
+import threading
 # Events:
 # When new player makes a connection, they are assigned an ID and are added to the game state
 # When the connection is closed, the player is removed
@@ -50,7 +52,6 @@ from snaikenet_server.server_commands import (
     GameServerCommandInterface,
     console_loop,
 )
-import asyncio
 
 
 def setup_logger(verbose: bool):
@@ -62,9 +63,7 @@ def setup_logger(verbose: bool):
     )  # Log to file as well, with rotation
 
 
-async def main():
-    args = parse_args()
-    setup_logger(args.verbose)
+async def async_main(args, renderer_queue):
     loop = asyncio.get_running_loop()
 
     tick_interval = 1 / args.tick_rate
@@ -84,25 +83,50 @@ async def main():
 
     # Create thread instances
     await asyncio.gather(
-        asyncio.create_task(
-            game_loop(
-                game,
-                tick_interval,
-                host=args.host,
-                tcp_port=args.tcp_port,
-                udp_port=args.udp_port,
-                clean_idle_clients=args.clean_idle_clients,
-                client_timeout_seconds=args.client_timeout,
-                headless=args.headless,
-            )
+        game_loop(
+            game,
+            tick_interval,
+            host=args.host,
+            tcp_port=args.tcp_port,
+            udp_port=args.udp_port,
+            renderer_queue=renderer_queue,
+            clean_idle_clients=args.clean_idle_clients,
+            client_timeout_seconds=args.client_timeout,
+            headless=args.headless,
         ),
         asyncio.to_thread(console_loop, command_interface),
     )
 
 
+def main():
+    args = parse_args()
+    setup_logger(args.verbose)
+
+    renderer_queue = queue.Queue()
+
+    if args.headless:
+        # No pygame, so we can just run asyncio on the main thread
+        asyncio.run(async_main(args, renderer_queue))
+    else:
+        logger.info(
+            "Detected not running in headless: Starting pygame renderer thread..."
+        )
+        # pygame must run on the main thread (required on macOS), so push
+        # the asyncio event loop into a background thread instead.
+        async_thread = threading.Thread(
+            target=lambda: asyncio.run(async_main(args, renderer_queue)),
+            daemon=True,
+        )
+        async_thread.start()
+
+        from snaikenet_server.game import pygame_renderer
+
+        pygame_renderer.render_loop(renderer_queue)
+
+
 def run_main():
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         logger.info("Server shutting down due to keyboard interrupt")
 
