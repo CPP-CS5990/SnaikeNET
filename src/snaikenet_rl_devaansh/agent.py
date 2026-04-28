@@ -39,8 +39,12 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
         self._prev_log_prob: float | None = None
         self._prev_value: float | None = None
 
+        self.update_count: int = 0
+
         # Callback set by __main__ so the handler can send directions to the server
         self.send_direction = None   # type: ignore[assignment]
+        # Callback invoked after each PPO update — set by __main__ for checkpointing
+        self.on_ppo_update = None   # type: ignore[assignment]
 
     def on_game_start(self, viewport_size: tuple[int, int]):
         in_channels = NUM_TILE_TYPES * N_FRAMES  # 5 * 2 = 10
@@ -84,6 +88,9 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
                     _, last_value = self.network.forward(curr_state.unsqueeze(0))
                 last_val = last_value.item() if frame.is_alive else 0.0
                 self.ppo.update(self.buffer, last_value=last_val)
+                self.update_count += 1
+                if self.on_ppo_update is not None:
+                    self.on_ppo_update(self.update_count)
 
         # 3. Select action for the current state
         if frame.is_alive:
