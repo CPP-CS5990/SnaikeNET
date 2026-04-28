@@ -3,8 +3,9 @@ from snaikenet_client.types import ClientTileType
 
 REWARD_FOOD          =  50.0
 REWARD_KILL          =  20.0
-REWARD_DEATH         = -10.0
-REWARD_STEP          =  -0.1   # small penalty each step to encourage urgency
+REWARD_DEATH         = -100.0
+REWARD_SURVIVAL      =  0.05   # small bonus for staying alive each step
+REWARD_STEP          = -0.1    # small penalty each step to encourage urgency
 REWARD_CLOSER_FOOD   =  1.0    # dense reward for moving toward nearest food
 REWARD_FARTHER_FOOD  = -0.5    # small penalty for moving away from food
 
@@ -40,7 +41,7 @@ def compute_reward(prev: ClientGameStateFrame,
     if not curr.is_alive and prev.is_alive:
         return REWARD_DEATH
 
-    reward = REWARD_STEP
+    reward = REWARD_STEP + REWARD_SURVIVAL
 
     if curr.player_length > prev.player_length:
         reward += REWARD_FOOD
