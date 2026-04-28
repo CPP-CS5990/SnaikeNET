@@ -49,12 +49,14 @@ def compute_reward(prev: ClientGameStateFrame,
     if curr.num_kills > prev.num_kills:
         reward += REWARD_KILL
 
-    prev_dist = _dist_to_food(prev)
-    curr_dist = _dist_to_food(curr)
-    if prev_dist is not None and curr_dist is not None:
-        if curr_dist < prev_dist:
-            reward += REWARD_CLOSER_FOOD
-        elif curr_dist > prev_dist:
-            reward += REWARD_FARTHER_FOOD
+    just_ate = curr.player_length > prev.player_length
+    if not just_ate:
+        prev_dist = _dist_to_food(prev)
+        curr_dist = _dist_to_food(curr)
+        if prev_dist is not None and curr_dist is not None:
+            if curr_dist < prev_dist:
+                reward += REWARD_CLOSER_FOOD
+            elif curr_dist > prev_dist:
+                reward += REWARD_FARTHER_FOOD
 
     return reward
