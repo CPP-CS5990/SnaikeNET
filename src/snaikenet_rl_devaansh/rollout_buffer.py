@@ -72,10 +72,10 @@ class RolloutBuffer:
 
         for t in reversed(range(self.capacity)):
             next_value = last_value if t == self.capacity - 1 else self.values[t + 1]
-            next_done = 0.0 if t == self.capacity - 1 else float(self.dones[t + 1])
+            non_terminal = 1.0 - float(self.dones[t])
 
-            delta = self.rewards[t] + self.gamma * next_value * (1 - next_done) - self.values[t]
-            gae = delta + self.gamma * self.gae_lambda * (1 - next_done) * gae
+            delta = self.rewards[t] + self.gamma * next_value * non_terminal - self.values[t]
+            gae = delta + self.gamma * self.gae_lambda * non_terminal * gae
             advantages[t] = gae
 
         returns  = advantages + torch.tensor(self.values)
