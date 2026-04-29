@@ -17,7 +17,9 @@ class ActorCritic(nn.Module):
         self.cnn = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3, stride=1),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2),
             nn.ReLU(),
             nn.Flatten(),
         )
