@@ -1,3 +1,4 @@
+import time
 import torch
 
 from snaikenet_client.client.client_event_handler import DefaultSnaikenetClientEventHandler
@@ -59,6 +60,8 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
         self._prev_state = None
 
     def on_game_state_update(self, frame: ClientGameStateFrame):
+        # Tick per second counter
+        # t0 = time.perf_counter()
         if self.network is None:
             return      # not initialized yet
 
@@ -114,6 +117,14 @@ class PPOAgentEventHandler(DefaultSnaikenetClientEventHandler):
         self._prev_action   = action_idx
         self._prev_log_prob = log_prob_val
         self._prev_value    = value_val
+
+        """ 
+        tick interval ms = elapsed_ms * 15
+        TPS calculation formula: 1000/tick interval ms
+        """
+
+        # elapsed_ms = (time.perf_counter() - t0) * 1000
+        # print(f"[agent] response: {elapsed_ms:.2f}ms")
 
     def on_game_restart(self):
         # New episode begins - reset episode state but keep buffer + networks

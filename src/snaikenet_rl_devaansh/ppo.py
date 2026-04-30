@@ -42,7 +42,7 @@ class PPO:
         Run PPO update using the data currently in 'buffer'.
 
         Steps:
-            1. Compute GAE advantages and returns from the buffer.
+            1. Compute GAE (Generalized Advantage Estimation) advantages and returns from the buffer.
             2. For n_epochs, shuffle the buffer and iterate in mini-batches
             3. For each mini-batch:
                 a) Re-evaluate actions under the current policy.
